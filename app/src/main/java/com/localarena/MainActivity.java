@@ -32,7 +32,18 @@ public class MainActivity extends Activity implements LocalNet.Listener{
   void header(Canvas c,String title,String sub){txt(c,"LOCALARENA",24*d,36*d,13,muted);txt(c,title,24*d,78*d,30,text);if(sub!=null)txt(c,sub,24*d,104*d,14,muted);}
   void home(Canvas c){header(c,"LOCALARENA","Локальный сборник настольных игр");button(c,"♟  Шахматы",140*d,Color.rgb(45,73,93));button(c,"⚓  Морской бой",208*d,Color.rgb(30,77,86));button(c,"♦  Дурак",276*d,Color.rgb(82,54,72));button(c,"＋  Создать комнату",360*d,Color.rgb(57,61,70));button(c,"↪  Войти в комнату",428*d,Color.rgb(48,67,76));button(c,"🛍  Магазин",496*d,Color.rgb(76,65,45));button(c,"⚙  Настройки",564*d,Color.rgb(48,52,58));}
   void room(Canvas c){header(c,host?"Комната создана":"Подключение","Порт "+LocalNet.PORT);rect(c,24*d,140*d,getWidth()-24*d,275*d,panel,20*d);txt(c,host?"IP для второго телефона":"IP хоста",48*d,174*d,14,muted);center(c,host?ip:"Ожидаю соединение…",getWidth()/2,225*d,24,text);txt(c,host?"Подключи второй телефон к этой сети.":"После подключения хост выберет игру.",48*d,255*d,13,muted);if(host&&connected)button(c,"Выбрать игру",320*d,Color.rgb(58,115,88));txt(c,message,24*d,420*d,14,muted);}
-  void store(Canvas c){header(c,"Магазин","Контент можно добавлять позже — архитектура уже готова.");rect(c,24*d,135*d,getWidth()-24*d,250*d,panel,20*d);txt(c,"🎨 Темы и скины",48*d,175*d,18,text);txt(c,"Пока доступен только базовый набор.",48*d,207*d,13,muted);txt(c,"Монетизация: отключена в MVP",48*d,232*d,13,muted);button(c,"Скоро: витрина контента",285*d,Color.rgb(58,61,70));button(c,"← Назад",365*d,Color.rgb(48,52,58));}
+  void store(Canvas c){
+header(c,"Магазин","Базовая версия уже полностью бесплатна.");
+rect(c,24*d,135*d,getWidth()-24*d,285*d,panel,20*d);
+txt(c,"💖 Поддержать автора",48*d,175*d,18,text);
+txt(c,"Добровольная поддержка — любая сумма.",48*d,204*d,13,muted);
+txt(c,"Платежи пока не подключены.",48*d,227*d,13,muted);
+txt(c,"⭐ Premium",48*d,265*d,18,text);
+txt(c,"Будущие скины, темы, эффекты и другие плюшки.",48*d,294*d,13,muted);
+txt(c,"Без рекламы. Без ограничений.",48*d,320*d,13,Color.rgb(150,220,190));
+button(c,"Скоро: контент и поддержка",345*d,Color.rgb(58,61,70));
+button(c,"← Назад",415*d,Color.rgb(48,52,58));
+}
 void settings(Canvas c){header(c,"Настройки","Сохраняются на устройстве.");rect(c,24*d,135*d,getWidth()-24*d,255*d,panel,20*d);txt(c,"Тема интерфейса",48*d,175*d,16,text);txt(c,monetization.themeId,48*d,207*d,14,muted);txt(c,"Выбранный набор",48*d,235*d,16,text);txt(c,monetization.selectedSkinId,48*d,265*d,14,muted);button(c,"Сбросить локальные настройки",290*d,Color.rgb(76,55,55));button(c,"← Назад",360*d,Color.rgb(48,52,58));}
 void picker(Canvas c){header(c,"Выбор игры",host?"Ты хост — выбери игру":"Хост выбирает игру");button(c,"♟  ШАХМАТЫ",150*d,Color.rgb(45,73,93));button(c,"⚓  МОРСКОЙ БОЙ",218*d,Color.rgb(30,77,86));button(c,"♦  ДУРАК",286*d,Color.rgb(82,54,72));}
   void chess(Canvas c){header(c,"Шахматы",chess.result==' '?"Твой цвет: "+(me==0?"белые":"чёрные"):(chess.result=='W'?"Победа белых":chess.result=='B'?"Победа чёрных":"Ничья"));float top=132*d,side=Math.min(getWidth()-32*d,getHeight()-top-70*d),cell=side/8,left=(getWidth()-side)/2;for(int y=0;y<8;y++)for(int x=0;x<8;x++){int bx=me==0?x:7-x,by=me==0?y:7-y;int s=ChessGame.sq(bx,by);p.setColor((x+y)%2==0?Color.rgb(230,221,201):Color.rgb(92,111,116));c.drawRect(left+x*cell,top+y*cell,left+(x+1)*cell,top+(y+1)*cell,p);char pc=chess.b[s];if(pc!='.')center(c,piece(pc),left+x*cell+cell/2,top+y*cell+cell*.68f,cell*.62f,Character.isUpperCase(pc)?Color.WHITE:Color.rgb(25,28,31));}txt(c,chess.result==' '?"Выбери фигуру и клетку":"Партия завершена",24*d,top+side+35*d,15,muted);}
