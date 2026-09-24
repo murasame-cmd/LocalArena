@@ -18,7 +18,7 @@ Monetization content is **not enabled yet**. The current build prepares the prod
 - A dedicated `MonetizationState` layer so billing/ads can be added without rewriting game logic.
 - Figma screens for Store, Settings and the game-library shell.
 
-Actual paid content, ads and purchase flows will be added later. Google Play one-time products can support permanent non-consumable unlocks such as premium themes or an ad-free version. citeturn0search0
+Actual paid content, ads and purchase flows will be added later. Google Play one-time products can support permanent non-consumable unlocks such as premium themes or an ad-free version.
 
 ## Local multiplayer
 Two phones play over the same local network without internet during the match. TCP is used for the MVP.
