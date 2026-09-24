@@ -17,7 +17,19 @@ public class MainActivity extends Activity implements LocalNet.Listener{
  @Override public void connected(boolean h,String address){connected=true;host=h;ip=address;if(view!=null)view.invalidate();}
  @Override public void status(String s){if(view!=null)view.message=s;view.invalidate();}
  @Override public void error(String e){connected=false;if(view!=null){view.message=e;view.invalidate();}}
- @Override public void line(String line){if(line.startsWith("GAME|")){startGame(line.substring(5));return;}if(line.startsWith("SEA_READY|")){String[]a=line.split("\\|",-1);if(host){applyGrid(Integer.parseInt(a[1]),a[2]);if(sea.ready[0]&&sea.ready[1])broadcastSea();}return;}if(line.startsWith("ACTION|")){if(!host)return;String[]a=line.split("\\|",-1);if(a[1].equals("CHESS")){if(a.length<4||!a[2].equals("1"))return;String[]m=a[3].split(",");if(m.length<2)return;int f=Integer.parseInt(m[0]),t=Integer.parseInt(m[1]);char pr=m.length>2&&!m[2].isEmpty()?m[2].charAt(0):0;if(!chess.white&&chess.move(new ChessGame.Move(f,t,pr)))broadcastChess();}else if(a[1].equals("SEA")){if(a.length<5||!a[2].equals("1"))return;int p=Integer.parseInt(a[2]),x=Integer.parseInt(a[3]),y=Integer.parseInt(a[4]);if(p==(sea.turn?0:1)&&sea.shoot(p,x,y))broadcastSea();}else if(a[1].equals("DURAK")){if(a.length<4||!a[3].equals("1"))return;if(handleDurak(a))broadcastDurak();}return;}if(line.startsWith("STATE|")){String[]a=line.split("\\|",3);if(a[1].equals("CHESS")){chess.decode(a[2]);show(Screen.CHESS);}else if(a[1].equals("SEA")){sea.decode(a[2]);show(Screen.SEA);}else if(a[1].equals("DURAK")){durak.decode(a[2]);show(Screen.DURAK);}}}
+ @Override public void line(String line){
+  try{
+   if(line.startsWith("GAME|")){String g=line.substring(5);if(g.equals("CHESS")||g.equals("SEA")||g.equals("DURAK"))startGame(g);return;}
+   if(line.startsWith("SEA_READY|")){String[]a=line.split("\\|",-1);if(host&&a.length==3&&a[1].equals("1")&&a[2].length()==100){applyGrid(1,a[2]);if(sea.ready[0]&&sea.ready[1])broadcastSea();}return;}
+   if(line.startsWith("ACTION|")){if(!host)return;String[]a=line.split("\\|",-1);if(a.length<2)return;
+    if(a[1].equals("CHESS")){if(a.length<4||!a[2].equals("1"))return;String[]m=a[3].split(",");if(m.length<2)return;int f=Integer.parseInt(m[0]),t=Integer.parseInt(m[1]);char pr=m.length>2&&!m[2].isEmpty()?m[2].charAt(0):0;if(!chess.white&&chess.move(new ChessGame.Move(f,t,pr)))broadcastChess();}
+    else if(a[1].equals("SEA")){if(a.length<5||!a[2].equals("1"))return;int p=Integer.parseInt(a[2]),x=Integer.parseInt(a[3]),y=Integer.parseInt(a[4]);if(p==(sea.turn?0:1)&&sea.shoot(p,x,y))broadcastSea();}
+    else if(a[1].equals("DURAK")){if(a.length<4||!a[3].equals("1"))return;if(handleDurak(a))broadcastDurak();}
+    return;
+   }
+   if(line.startsWith("STATE|")){String[]a=line.split("\\|",3);if(a.length<3)return;if(a[1].equals("CHESS")){chess.decode(a[2]);show(Screen.CHESS);}else if(a[1].equals("SEA")){sea.decode(a[2]);show(Screen.SEA);}else if(a[1].equals("DURAK")){durak.decode(a[2]);show(Screen.DURAK);}}
+  }catch(Exception ignored){}
+ }
  boolean handleDurak(String[]a){try{String action=a[2];int p=Integer.parseInt(a[3]);if(action.equals("ATTACK"))return durak.addAttack(p,Integer.parseInt(a[4]));if(action.equals("DEFEND"))return durak.defend(p,Integer.parseInt(a[4]),Integer.parseInt(a[5]));if(action.equals("PASS"))return durak.passAttack(p);if(action.equals("TAKE"))return durak.take(p);}catch(Exception ignored){}return false;}
  void chessAction(int from,int to){if(host){if(chess.move(new ChessGame.Move(from,to,(char)0)))broadcastChess();}else net.send("ACTION|CHESS|1|"+from+","+to+",");}
  void seaAction(int x,int y){if(sea.winner>=0||sea.turn!=(me==0)||!sea.ready[0]||!sea.ready[1])return;if(host){if(sea.shoot(me,x,y))broadcastSea();}else net.send("ACTION|SEA|1|"+x+"|"+y);}
