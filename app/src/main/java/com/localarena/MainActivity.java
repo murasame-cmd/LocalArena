@@ -4,7 +4,7 @@ import android.app.*;import android.os.*;import android.graphics.*;import androi
 
 public class MainActivity extends Activity implements LocalNet.Listener{
  enum Screen{HOME,ROOM,PICKER,STORE,SETTINGS,CHESS,SEA,DURAK} Screen screen=Screen.HOME; LocalNet net; boolean host=false,connected=false; String ip=""; int me=0; String selectedGame=""; MonetizationState monetization=new MonetizationState(); ChessGame chess=new ChessGame(); SeaBattleGame sea=new SeaBattleGame(); DurakGame durak=new DurakGame(); ArenaView view;
- @Override public void onCreate(Bundle b){super.onCreate(b);getWindow().setStatusBarColor(Color.rgb(11,13,16));getWindow().setNavigationBarColor(Color.rgb(11,13,16));net=new LocalNet(new Handler(Looper.getMainLooper()),this);show(Screen.HOME);}
+ @Override public void onCreate(Bundle b){super.onCreate(b);getWindow().setStatusBarColor(Color.rgb(11,13,16));getWindow().setNavigationBarColor(Color.rgb(11,13,16));net=new LocalNet(new Handler(Looper.getMainLooper()),this);monetization.load(this);show(Screen.HOME);}
  void show(Screen s){screen=s;view=new ArenaView(this);setContentView(view);}
  void host(){host=true;me=0;ip=LocalNet.localIp();show(Screen.ROOM);net.host();}
  void join(String addr){if(addr==null||addr.trim().isEmpty()){Toast.makeText(this,"Введи IP хоста",Toast.LENGTH_SHORT).show();return;}host=false;me=1;ip=addr.trim();show(Screen.ROOM);net.join(ip);}
