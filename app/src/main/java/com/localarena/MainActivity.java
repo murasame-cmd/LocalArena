@@ -6,7 +6,7 @@ public class MainActivity extends Activity implements LocalNet.Listener{
  enum Screen{HOME,ROOM,PICKER,CHESS,SEA,DURAK} Screen screen=Screen.HOME; LocalNet net; boolean host=false,connected=false; String ip=""; int me=0; String selectedGame=""; ChessGame chess=new ChessGame(); SeaBattleGame sea=new SeaBattleGame(); DurakGame durak=new DurakGame(); ArenaView view;
  @Override public void onCreate(Bundle b){super.onCreate(b);getWindow().setStatusBarColor(Color.rgb(11,13,16));getWindow().setNavigationBarColor(Color.rgb(11,13,16));net=new LocalNet(new Handler(Looper.getMainLooper()),this);show(Screen.HOME);}
  void show(Screen s){screen=s;view=new ArenaView(this);setContentView(view);}
- void host(){host=true;me=0;show(Screen.ROOM);net.host();}
+ void host(){host=true;me=0;ip=LocalNet.localIp();show(Screen.ROOM);net.host();}
  void join(String addr){if(addr==null||addr.trim().isEmpty()){Toast.makeText(this,"Введи IP хоста",Toast.LENGTH_SHORT).show();return;}host=false;me=1;ip=addr.trim();show(Screen.ROOM);net.join(ip);}
  void startGame(String g){selectedGame=g;if(g.equals("CHESS")){chess.reset();show(Screen.CHESS);}else if(g.equals("SEA")){sea.reset();sea.randomPlace(me,System.nanoTime());sea.ready[me]=true;show(Screen.SEA);net.send("SEA_READY|"+me+"|"+grid(sea.cells[me]));}else{durak.reset();show(Screen.DURAK);}if(host&&g.equals("DURAK"))net.send("STATE|DURAK|"+durak.encodeFor(1));}
  String grid(int[][]g){StringBuilder s=new StringBuilder();for(int y=0;y<10;y++)for(int x=0;x<10;x++)s.append(g[y][x]);return s.toString();}
