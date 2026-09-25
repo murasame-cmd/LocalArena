@@ -33,7 +33,7 @@ jobs:
           RUN_NUMBER: ${{ github.event.workflow_run.run_number }}
           TARGET_SHA: ${{ github.event.workflow_run.head_sha }}
         run: |
-          APK="./artifact/app-debug.apk"
+          APK="./artifact/LocalArena.apk"
           TAG="v0.1.0-build-${RUN_NUMBER}"
           ASSET="LocalArena-${TAG}.apk"
           cp "${APK}" "${ASSET}"
