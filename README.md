@@ -45,3 +45,5 @@ Two phones play over the same local network without internet during the match. T
 
 ## Build
 GitHub Actions runs the JVM logic simulation and builds a debug APK on pushes to main. Release builds can be published from the same workflow and attach the APK directly to GitHub Releases.
+
+The latest tested APK is published to Releases when a commit marked [release] passes the Android CI workflow.
