@@ -2,6 +2,12 @@
 
 LocalArena is an offline-first Android collection of local multiplayer tabletop games.
 
+## 📲 Скачать APK
+
+**[⬇️ Скачать последнюю версию APK](https://github.com/murasame-cmd/LocalArena/releases/latest)**
+
+Все опубликованные сборки доступны в разделе **Releases**. Для Android скачивай файл `LocalArena-v*.apk` и устанавливай его на телефон.
+
 ## Current games
 - Chess
 - Sea Battle
@@ -38,4 +44,4 @@ The current build prepares the product for later additions without changing the 
 Two phones play over the same local network without internet during the match. TCP is used for the MVP.
 
 ## Build
-GitHub Actions builds a debug APK on pushes to main.
+GitHub Actions runs the JVM logic simulation and builds a debug APK on pushes to main. Release builds can be published from the same workflow and attach the APK directly to GitHub Releases.
