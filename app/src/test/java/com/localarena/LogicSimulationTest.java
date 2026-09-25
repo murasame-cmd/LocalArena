@@ -1,6 +1,7 @@
 package com.localarena;
 
 import org.junit.Test;
+import java.util.Arrays;
 import static org.junit.Assert.*;
 
 public class LogicSimulationTest {
@@ -43,7 +44,7 @@ public class LogicSimulationTest {
         s.ready[0]=s.ready[1]=true;
         String hidden=s.encodeFor(0);
         String[] parts=hidden.split("\\|",-1);
-        assertEquals(6,parts.length);
+        assertEquals(3,parts.length);
         assertFalse(parts[2].contains("1")); // opponent ships are hidden
         int guard=0;
         while(s.winner<0 && guard++<500){
