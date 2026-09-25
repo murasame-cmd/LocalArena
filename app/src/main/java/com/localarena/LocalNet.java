@@ -115,7 +115,7 @@ final class LocalNet {
       log("DISCOVERY_RX from="+p.getAddress().getHostAddress()+" msg="+msg);
       if(msg.startsWith(DISCOVERY_RESPONSE+"|")){
        String ip=p.getAddress().getHostAddress();
-       if(found.add(ip))postDiscovered(ip);
+       if(found.add(ip)){postDiscovered(ip);break;}
       }
      }catch(SocketTimeoutException ignored){}
     }
