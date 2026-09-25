@@ -25,3 +25,6 @@
 
 ## Release automation
 - Current MVP release publishing is triggered by a commit containing `[release]` in its message.
+
+## Release automation
+- Direct APK download through GitHub Releases is enabled for successful release commits.
