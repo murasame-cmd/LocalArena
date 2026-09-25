@@ -123,7 +123,7 @@ final class LocalNet {
 
     postConnected(runId,false,target);
     postStatus(runId,"🟢 Соединение установлено");
-    readLoop();
+    readLoop(runId);
    }catch(ConnectException e){
     logException("JOIN_REFUSED",e);
     if(active(runId))postError(runId,"Подключение отклонено. Проверь IP хоста, одну Wi‑Fi сеть и отсутствие изоляции клиентов.");
@@ -177,7 +177,7 @@ final class LocalNet {
       }
 
       long deadline=System.currentTimeMillis()+DISCOVERY_WINDOW_MS;
-      while(System.currentTimeMillis()<deadline&&!closing){
+      while(System.currentTimeMillis()<deadline&&active(runId)){
        try{
         byte[] buf=new byte[256];
         DatagramPacket p=new DatagramPacket(buf,buf.length);
@@ -200,7 +200,7 @@ final class LocalNet {
     }
 
     if(active(runId)){
-     postError("Автопоиск не нашёл хост. Введи IP хоста вручную — это основной fallback.");
+     postError(runId,"Автопоиск не нашёл хост. Введи IP хоста вручную — это основной fallback.");
     }
    }catch(Exception e){
     logException("DISCOVERY_ERROR",e);
