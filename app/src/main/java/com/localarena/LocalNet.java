@@ -315,6 +315,7 @@ final class LocalNet {
   try{if(server!=null)server.close();}catch(Exception e){logException("CLOSE_SERVER_ERROR",e);}
   try{if(discoverySocket!=null)discoverySocket.close();}catch(Exception e){logException("CLOSE_DISCOVERY_ERROR",e);}
   socket=null;server=null;discoverySocket=null;in=null;out=null;
+  try{ConnectivityManager cm=(ConnectivityManager)appContext.getSystemService(Context.CONNECTIVITY_SERVICE);if(cm!=null)cm.bindProcessToNetwork(null);}catch(Exception e){logException("WIFI_UNBIND_ERROR",e);}
   log("CLOSE_DONE");
  }
 
