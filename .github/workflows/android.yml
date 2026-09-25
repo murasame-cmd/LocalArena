@@ -37,6 +37,13 @@ jobs:
       - name: Build debug APK
         run: gradle :app:assembleDebug --stacktrace
 
+      - name: Enable KVM group permissions
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+          ls -l /dev/kvm
+
       - name: Run emulator smoke tests
         timeout-minutes: 15
         uses: reactivecircus/android-emulator-runner@v2
@@ -52,6 +59,7 @@ jobs:
           emulator-boot-timeout: 300
           emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
           disable-animations: true
+          disable-linux-hw-accel: false
           script: gradle :app:connectedDebugAndroidTest --no-daemon --stacktrace
 
       - name: Prepare release APK
