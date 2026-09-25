@@ -47,7 +47,14 @@ public class LogicSimulationTest {
         String[] parts=hidden.split("\\|",-1);
         assertEquals(3,parts.length);
         assertFalse(parts[2].contains("1")); // opponent ships are hidden
-        String encoded=s.encodeFor(1);\n        String[] encodedParts=encoded.split("\\\\|",-1);\n        assertEquals(3,encodedParts.length);\n        SeaBattleGame replica=new SeaBattleGame();\n        replica.decode(encoded);\n        assertTrue(replica.ready[0]&&replica.ready[1]);\n        int ownCell=replica.cells[1][0][0];\n        assertTrue(ownCell>=0&&ownCell<=3);
+        String encoded=s.encodeFor(1);
+        String[] encodedParts=encoded.split("\\|",-1);
+        assertEquals(3,encodedParts.length);
+        SeaBattleGame replica=new SeaBattleGame();
+        replica.decode(encoded);
+        assertTrue(replica.ready[0]&&replica.ready[1]);
+        int ownCell=replica.cells[1][0][0];
+        assertTrue(ownCell>=0&&ownCell<=3);
         int guard=0;
         while(s.winner<0 && guard++<500){
             int p=s.turn?0:1;
