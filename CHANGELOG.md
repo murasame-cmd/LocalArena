@@ -8,6 +8,8 @@
 - Voluntary author support and future Premium cosmetics are planned, but payments are not connected yet.
 
 ## 0.1.0 — Release build
+- First automated Release publication is enabled for the tested APK.
+
 - APK is now published directly as a GitHub Release asset.
 - The repository's **Releases** page is the primary download location for published APK builds.
 - GitHub Actions still keeps the APK as a workflow artifact for CI/debugging.
