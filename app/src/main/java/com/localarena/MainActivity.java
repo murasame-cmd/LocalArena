@@ -16,7 +16,7 @@ public class MainActivity extends Activity implements LocalNet.Listener{
  void broadcastDurak(){net.send("STATE|DURAK|"+durak.encodeFor(1));}
  @Override public void connected(boolean h,String address){connected=true;host=h;ip=address;if(view!=null)view.invalidate();}
  @Override public void discovered(String address){if(screen!=Screen.HOME)return;host=false;me=1;ip=address;show(Screen.ROOM);net.join(address);}
- @Override public void status(String s){if(view!=null)view.message=s;view.invalidate();}
+ @Override public void status(String s){if(view!=null){view.message=s;view.invalidate();}}
  @Override public void error(String e){connected=false;if(view!=null){view.message=e;view.invalidate();}}
  @Override public void line(String line){
   Log.d("LocalArenaNet","MAIN_RX "+line);
