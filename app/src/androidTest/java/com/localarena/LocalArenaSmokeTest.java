@@ -87,16 +87,21 @@ public class LocalArenaSmokeTest {
                         a.sea.randomPlace(0, round+1L);
                         a.sea.randomPlace(1, round+2L);
                         a.sea.ready[0]=a.sea.ready[1]=true;
-                        float size=Math.min(a.view.getWidth()-48*a.view.d,a.view.getHeight()/2.8f);
+                        int targetX=0,targetY=0;
+                        outer: for(int yy=0;yy<10;yy++) for(int xx=0;xx<10;xx++) if(a.sea.cells[1][yy][xx]==1){targetX=xx;targetY=yy;break outer;}
+                        float top=135*a.view.d,gap=34*a.view.d,bottom=28*a.view.d;
+                        float size=Math.min(a.view.getWidth()-48*a.view.d,(a.view.getHeight()-top-gap-bottom)/2f);
                         float left=(a.view.getWidth()-size)/2f;
-                        float y=135*a.view.d+size+55*a.view.d+0.5f*size;
-                        float x=left+0.5f*size;
+                        float cell=size/10f;
+                        float y=top+size+gap+(targetY+0.5f)*cell;
+                        float x=left+(targetX+0.5f)*cell;
                         long t=System.currentTimeMillis();
                         MotionEvent d=MotionEvent.obtain(t,t,MotionEvent.ACTION_DOWN,x,y,0);
                         a.view.onTouchEvent(d); d.recycle();
                         MotionEvent u=MotionEvent.obtain(t,t+5,MotionEvent.ACTION_UP,x,y,0);
                         a.view.onTouchEvent(u); u.recycle();
                     });
+                    assertEquals("Sea tap must reach the drawn enemy cell",3,a.sea.cells[1][targetY][targetX]);
                 } else {
                     inst.runOnMainSync(() -> {
                         if (!a.durak.hand[0].isEmpty()) {
