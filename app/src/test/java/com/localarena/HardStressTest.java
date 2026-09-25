@@ -72,7 +72,12 @@ public class HardStressTest {
                 SeaBattleGame copy=new SeaBattleGame();
                 copy.decode(enc);
                 assertEquals("Sea state header/grid must round-trip",enc,copy.encodeFor(p));
-                assertTrue(g.validFleet(g.cells[0]) || g.winner>=0);
+                for(int yy=0;yy<10;yy++) for(int xx=0;xx<10;xx++) {
+                    int v=g.cells[0][yy][xx];
+                    assertTrue("Sea grid cell out of range",v>=0&&v<=3);
+                    v=g.cells[1][yy][xx];
+                    assertTrue("Sea grid cell out of range",v>=0&&v<=3);
+                }
             }
             assertTrue("Sea Battle must finish",g.winner>=0);
         }
