@@ -19,6 +19,7 @@ final class LocalNet {
   void status(String s);
   void error(String e);
   void discovered(String ip);
+  void hostAddress(String ip);
  }
  static final int PORT=47821;
  static final int DISCOVERY_PORT=47822;
@@ -37,16 +38,18 @@ final class LocalNet {
 
  void host(){
   close(); closing=false;
-  logNetworkEnvironment("HOST_START");
-  startDiscoveryResponder();
   new Thread(()->{
+   logNetworkEnvironment("HOST_START");
+   startDiscoveryResponder();
    try{
     log("HOST_BIND_START port="+PORT);
     ServerSocket ss=new ServerSocket();
     ss.setReuseAddress(true);
     ss.bind(new InetSocketAddress("0.0.0.0",PORT));
     server=ss;
-    log("HOST_LISTENING port="+PORT+" localIp="+localIp()+" bound="+ss.getLocalSocketAddress());
+    String hostIp=localIp();
+    log("HOST_LISTENING port="+PORT+" localIp="+hostIp+" bound="+ss.getLocalSocketAddress());
+    postHostAddress(hostIp);
     postStatus("Ждём второго игрока…");
     ss.setSoTimeout(CONNECT_TIMEOUT_MS);
     log("HOST_ACCEPT_WAIT timeoutMs="+CONNECT_TIMEOUT_MS);
@@ -71,9 +74,9 @@ final class LocalNet {
 
  void join(String ip){
   close(); closing=false;
-  logNetworkEnvironment("JOIN_START target="+(ip==null?"":ip.trim()));
   final String target=ip==null?"":ip.trim();
   new Thread(()->{
+   logNetworkEnvironment("JOIN_START target="+target);
    try{
     postStatus("Подключение к "+target+"…");
     log("JOIN_CONNECT_START target="+target+" port="+PORT+" timeoutMs="+CONNECT_TIMEOUT_MS);
@@ -100,8 +103,8 @@ final class LocalNet {
 
  void discover(){
   close(); closing=false;
-  logNetworkEnvironment("DISCOVERY_START");
   new Thread(()->{
+   logNetworkEnvironment("DISCOVERY_START");
    Set<String> found=new LinkedHashSet<>();
    try{
     byte[] data=DISCOVERY_REQUEST.getBytes("UTF-8");
