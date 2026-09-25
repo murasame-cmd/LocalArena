@@ -8,6 +8,7 @@
 - Voluntary author support and future Premium cosmetics are planned, but payments are not connected yet.
 
 ## 0.1.0 — Release build
+- Release automation syntax was hardened and verified for the APK publishing workflow.
 - First automated Release publication is enabled for the tested APK.
 
 - APK is now published directly as a GitHub Release asset.
