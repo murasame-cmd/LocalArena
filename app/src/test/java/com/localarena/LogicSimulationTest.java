@@ -16,6 +16,7 @@ public class LogicSimulationTest {
         assertTrue(g.move(new ChessGame.Move(sq(4,3),sq(3,2),(char)0))); // exd6 e.p.
         assertEquals('P',g.b[sq(3,2)]);
         assertEquals('.',g.b[sq(3,3)]);
+        ChessGame replica=new ChessGame();replica.decode(g.encode());assertArrayEquals(g.b,replica.b);assertEquals(g.white,replica.white);
 
         g.reset();
         assertTrue(g.move(new ChessGame.Move(sq(4,6),sq(4,4),(char)0)));
@@ -46,6 +47,7 @@ public class LogicSimulationTest {
         String[] parts=hidden.split("\\|",-1);
         assertEquals(3,parts.length);
         assertFalse(parts[2].contains("1")); // opponent ships are hidden
+        SeaBattleGame replica=new SeaBattleGame();replica.decode(s.encodeFor(1));assertTrue(replica.ready[0]&&replica.ready[1]);assertTrue(replica.cells[1][0][0]>=0&&replica.cells[1][0][0]<=3);
         int guard=0;
         while(s.winner<0 && guard++<500){
             int p=s.turn?0:1;
@@ -67,6 +69,7 @@ public class LogicSimulationTest {
         assertEquals(6,d.hand[1].size());
         assertEquals(24,d.deck.size());
         assertTrue(d.trump>=0&&d.trump<4);
+        DurakGame replica=new DurakGame();replica.decode(d.encodeFor(1));assertEquals(6,replica.hand[1].size());assertEquals(24,replica.deck.size());
 
         d.deck.clear();
         d.hand[0].clear(); d.hand[1].clear();
