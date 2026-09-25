@@ -6,7 +6,7 @@ public class MainActivity extends Activity implements LocalNet.Listener{
  enum Screen{HOME,ROOM,PICKER,STORE,SETTINGS,CHESS,SEA,DURAK} Screen screen=Screen.HOME; LocalNet net; boolean host=false,connected=false; String ip=""; int me=0; String selectedGame=""; MonetizationState monetization=new MonetizationState(); ChessGame chess=new ChessGame(); SeaBattleGame sea=new SeaBattleGame(); DurakGame durak=new DurakGame(); ArenaView view;
  @Override public void onCreate(Bundle b){super.onCreate(b); final Thread.UncaughtExceptionHandler previousCrashHandler=Thread.getDefaultUncaughtExceptionHandler(); Thread.setDefaultUncaughtExceptionHandler((thread,error)->{Log.e("LocalArenaCrash","UNCAUGHT thread="+thread.getName(),error);if(previousCrashHandler!=null)previousCrashHandler.uncaughtException(thread,error);}); if(Build.VERSION.SDK_INT>=33)getOnBackInvokedDispatcher().registerOnBackInvokedCallback(0,()->navigateBack()); getWindow().setStatusBarColor(Color.rgb(11,13,16));getWindow().setNavigationBarColor(Color.rgb(11,13,16));net=new LocalNet(this,new Handler(Looper.getMainLooper()),this);monetization.load(this);show(Screen.HOME);}
  void show(Screen s){screen=s;view=new ArenaView(this);setContentView(view);}
- void host(){host=true;me=0;ip=LocalNet.localIp();show(Screen.ROOM);net.host();}
+ void host(){host=true;me=0;ip="Определяется…";show(Screen.ROOM);net.host();}
  void join(String addr){if(addr==null||addr.trim().isEmpty()){Toast.makeText(this,"Введи IP хоста",Toast.LENGTH_SHORT).show();return;}host=false;me=1;ip=addr.trim();show(Screen.ROOM);net.join(ip);}
  void startGame(String g){try{if(g==null||(!g.equals("CHESS")&&!g.equals("SEA")&&!g.equals("DURAK")))return;selectedGame=g;if(g.equals("CHESS")){chess.reset();show(Screen.CHESS);}else if(g.equals("SEA")){sea.reset();sea.randomPlace(me,System.nanoTime());sea.ready[me]=true;show(Screen.SEA);net.send("SEA_READY|"+me+"|"+grid(sea.cells[me]));}else{durak.reset();show(Screen.DURAK);if(host)net.send("STATE|DURAK|"+durak.encodeFor(1));}}catch(Exception e){net.close();connected=false;screen=Screen.ROOM;view=new ArenaView(this);view.message="Ошибка запуска игры: "+e.getClass().getSimpleName();setContentView(view);}}
  String grid(int[][]g){StringBuilder s=new StringBuilder();for(int y=0;y<10;y++)for(int x=0;x<10;x++)s.append(g[y][x]);return s.toString();}
@@ -16,6 +16,7 @@ public class MainActivity extends Activity implements LocalNet.Listener{
  void broadcastDurak(){net.send("STATE|DURAK|"+durak.encodeFor(1));}
  @Override public void connected(boolean h,String address){connected=true;host=h;ip=address;if(view!=null)view.invalidate();}
  @Override public void discovered(String address){if(screen!=Screen.HOME)return;host=false;me=1;ip=address;show(Screen.ROOM);net.join(address);}
+ @Override public void hostAddress(String address){if(host){ip=address;if(view!=null)view.invalidate();}}
  @Override public void status(String s){if(view!=null){view.message=s;view.invalidate();}}
  @Override public void error(String e){connected=false;if(view!=null){view.message=e;view.invalidate();}}
  @Override public void line(String line){
