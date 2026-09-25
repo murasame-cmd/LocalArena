@@ -121,4 +121,39 @@ public class LogicSimulationTest {
         assertTrue(d.hand[1].contains(0));
         assertEquals(0,d.attacker); // attacker stays attacker after take
     }
+
+    @Test public void chessPromotionAutoQueensAndRoundTrips() {
+        ChessGame g=new ChessGame();
+        Arrays.fill(g.b, ChessGame.E);
+        g.b[sq(4,7)]='K'; g.b[sq(4,0)]='k'; g.b[sq(0,1)]='P';
+        g.white=true;
+        assertTrue(g.move(new ChessGame.Move(sq(0,1),sq(0,0),(char)0)));
+        assertEquals('Q',g.b[sq(0,0)]);
+        ChessGame replica=new ChessGame(); replica.decode(g.encode());
+        assertEquals('Q',replica.b[sq(0,0)]);
+    }
+
+    @Test public void seaBattleRejectsMalformedState() {
+        SeaBattleGame s=new SeaBattleGame();
+        try {
+            s.decode("0,-1,1,1|000|000");
+            fail("Malformed grid must be rejected");
+        } catch (IllegalArgumentException expected) {}
+    }
+
+    @Test public void durakRejectsInvalidAttackRanksAndDuplicateCards() {
+        DurakGame d=new DurakGame();
+        d.deck.clear(); d.hand[0].clear(); d.hand[1].clear();
+        d.hand[0].add(0);   // 6♠
+        d.hand[0].add(4);   // 7♠
+        d.hand[1].add(8);   // 8♠
+        d.hand[1].add(9);   // 8♥
+        d.trump=2; d.attacker=0; d.defender=1; d.finished=false;
+        assertTrue(d.addAttack(0,0));
+        assertFalse(d.addAttack(0,4)); // rank 7 is not represented by attack/defense
+        assertFalse(d.addAttack(0,0)); // already removed from hand
+        assertTrue(d.defend(1,8,0));
+        assertFalse(d.defend(1,9,0)); // slot already covered
+    }
+
 }
