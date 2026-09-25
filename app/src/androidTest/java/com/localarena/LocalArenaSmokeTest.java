@@ -3,7 +3,6 @@ package com.localarena;
 import android.app.Instrumentation;
 import android.Manifest;
 import android.content.Intent;
-import android.os.Looper;
 import android.view.View;
 import android.view.MotionEvent;
 import android.graphics.Bitmap;
@@ -41,15 +40,17 @@ public class LocalArenaSmokeTest {
         inst.runOnMainSync(a::finish);
     }
 
-    @Test public void interactionAndMalformedProtocolStress() throws Exception {
+    @Test(timeout=120000) public void interactionAndMalformedProtocolStress() throws Exception {
         Instrumentation inst = InstrumentationRegistry.getInstrumentation();
         Intent intent = new Intent(inst.getTargetContext(), MainActivity.class);
+        intent.putExtra("SKIP_RUNTIME_PERMISSIONS", true);
         intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
         MainActivity a = (MainActivity) inst.startActivitySync(intent);
         assertNotNull(a);
 
         String[] games = {"CHESS", "SEA", "DURAK"};
-        for (int round=0; round<2; round++) {\n            final int currentRound = round;
+        for (int round=0; round<2; round++) {
+            final int currentRound = round;
             for (String game : games) {
                 inst.runOnMainSync(() -> {
                     a.host = true;
@@ -69,7 +70,6 @@ public class LocalArenaSmokeTest {
                 assertTrue(!a.isFinishing() && !a.isDestroyed());
 
                 if (game.equals("CHESS")) {
-                    final float[] xy = {a.view.getWidth()/2f, 132*a.view.d + 0.5f*(Math.min(a.view.getWidth()-32*a.view.d, a.view.getHeight()-132*a.view.d-70*a.view.d)/8f)};
                     inst.runOnMainSync(() -> {
                         float side=Math.min(a.view.getWidth()-32*a.view.d,a.view.getHeight()-132*a.view.d-70*a.view.d);
                         float cell=side/8f;
