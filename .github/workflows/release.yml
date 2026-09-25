@@ -1,0 +1,53 @@
+name: Android Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version (for example v0.1.0)'
+        required: true
+        default: 'v0.1.0'
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v6
+        with:
+          gradle-version: '9.6.1'
+
+      - name: Run JVM logic simulation
+        run: gradle :app:testDebugUnitTest --stacktrace
+
+      - name: Build debug APK
+        run: gradle :app:assembleDebug --stacktrace
+
+      - name: Prepare release APK
+        run: cp app/build/outputs/apk/debug/app-debug.apk "LocalArena-${{ github.event_name == 'workflow_dispatch' && inputs.version || github.ref_name }}.apk"
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.version || github.ref_name }}
+        run: |
+          gh release create "$TAG" "LocalArena-$TAG.apk#LocalArena APK" \
+            --title "LocalArena $TAG" \
+            --generate-notes \
+            --latest
