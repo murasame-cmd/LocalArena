@@ -19,3 +19,6 @@
 - Added stable placeholders for future cosmetic Premium content.
 - Kept billing, payments, paid content and ads disabled until the base MVP is finished.
 - Existing offline multiplayer games remain the core of the MVP.
+
+## Release automation
+- Current MVP release publishing is triggered by a commit containing `[release]` in its message.
