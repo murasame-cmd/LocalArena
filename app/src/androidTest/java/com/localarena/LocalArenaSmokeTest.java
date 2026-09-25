@@ -1,6 +1,7 @@
 package com.localarena;
 
 import android.app.Instrumentation;
+import android.Manifest;
 import android.content.Intent;
 import android.os.Looper;
 import android.view.View;
@@ -14,6 +15,7 @@ import static org.junit.Assert.*;
 public class LocalArenaSmokeTest {
     @Test public void allGameScreensOpenAndRender() throws Exception {
         Instrumentation inst = InstrumentationRegistry.getInstrumentation();
+        try { inst.getUiAutomation().grantRuntimePermission(inst.getTargetContext().getPackageName(), Manifest.permission.NEARBY_WIFI_DEVICES); } catch (Exception ignored) {}
         Intent intent = new Intent(inst.getTargetContext(), MainActivity.class);
         intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
         MainActivity a = (MainActivity) inst.startActivitySync(intent);
