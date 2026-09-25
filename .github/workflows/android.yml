@@ -32,6 +32,15 @@ jobs:
       - name: Build debug APK
         run: gradle :app:assembleDebug --stacktrace
 
+      - name: Run emulator smoke tests
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          target: google_apis
+          arch: x86_64
+          profile: pixel_2
+          script: gradle :app:connectedDebugAndroidTest --stacktrace
+
       - name: Prepare release APK
         run: cp app/build/outputs/apk/debug/app-debug.apk app/build/outputs/apk/debug/LocalArena.apk
 
