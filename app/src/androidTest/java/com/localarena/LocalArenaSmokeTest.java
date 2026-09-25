@@ -17,6 +17,7 @@ public class LocalArenaSmokeTest {
         Instrumentation inst = InstrumentationRegistry.getInstrumentation();
         try { inst.getUiAutomation().grantRuntimePermission(inst.getTargetContext().getPackageName(), Manifest.permission.NEARBY_WIFI_DEVICES); } catch (Exception ignored) {}
         Intent intent = new Intent(inst.getTargetContext(), MainActivity.class);
+        intent.putExtra("SKIP_RUNTIME_PERMISSIONS", true);
         intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
         MainActivity a = (MainActivity) inst.startActivitySync(intent);
         assertNotNull(a);
