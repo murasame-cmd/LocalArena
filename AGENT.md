@@ -1,541 +1,281 @@
-# AGENT.md — LocalArena project handoff
+# AGENT.md — LocalArena current agent handoff
 
-## 1. Project identity
+## 1. Project
+- Repository: `murasame-cmd/LocalArena`
+- Android Java app: `com.localarena`
+- minSdk 26, compileSdk 36, targetSdk 36
+- Games: Chess, Sea Battle, Durak
+- Product: offline/local multiplayer over the same local network; no internet required for gameplay.
+- Figma: `qkMoHCeSm9dg0jThZWZh7y`
 
-Project: **LocalArena**
+## 2. User / working style
+The user is Russian-speaking and wants direct implementation, not tutorials.
+When a real bug is found:
+1. inspect the actual current repository state;
+2. fix it proactively;
+3. add/adjust regression tests where possible;
+4. run JVM tests;
+5. build APK;
+6. commit meaningful changes;
+7. verify GitHub Actions;
+8. report only what was actually verified.
 
-Repository: `murasame-cmd/LocalArena`
+Never claim a physical two-phone test happened unless the user provides the result/logs or an actual device test environment exists.
 
-Official repository:
-https://github.com/murasame-cmd/LocalArena
+## 3. CRITICAL CURRENT ISSUE
+Physical two-phone multiplayer is STILL NOT WORKING.
 
-Purpose:
-An Android offline-first local multiplayer game platform. Two players on different phones should be able to play without internet, over the same local Wi-Fi/network.
+Latest user report:
+- both phones still do not connect;
+- on the host, after the connection screen, the host can reach the game-selection button/state;
+- nevertheless the phones do not establish a usable multiplayer session;
+- user explicitly says previous fixes did not change the real behavior.
 
-Current games:
-1. Chess — Шахматы
-2. Sea Battle — Морской бой
-3. Durak — Дурак
+This means the network problem is NOT considered solved.
 
-Current platform:
-- Android
-- Java
-- TCP local networking
-- minSdk 26
-- compileSdk 36
-- targetSdk 36
-- namespace/applicationId: `com.localarena`
+Do not respond with another generic “build passed” as if this proves connectivity.
 
-iOS is NOT implemented yet.
+## 4. Current networking architecture
+Main network class:
+`app/src/main/java/com/localarena/LocalNet.java`
 
-## 2. How to work with the user
+Current intended TCP flow:
+1. Host binds TCP `0.0.0.0:47821`.
+2. Host listens for a guest.
+3. Guest connects to host IP on TCP 47821.
+4. Handshake:
+   - host sends `HELLO|1`
+   - guest replies `HELLO_ACK|1`
+5. Socket read timeout is reset after handshake.
+6. Game messages then flow over the TCP connection.
 
-The user is Russian-speaking and prefers:
-- casual Russian;
-- direct, practical communication;
-- actual implementation instead of long tutorials;
-- when a bug is found, fix it directly rather than waiting for approval;
-- make a GitHub commit after meaningful fixes;
-- run tests/build after changes;
-- report only verified results.
+Current discovery:
+- UDP discovery port: `47822`
+- request: `LOCALARENA_DISCOVER|1`
+- response: `LOCALARENA_HOST|1|<ip>|47821`
+- host starts a UDP responder;
+- guest broadcasts discovery on available IPv4 interfaces and waits for a response.
 
-Important:
-- Do NOT claim that a physical two-phone test was performed unless the user actually provides the result/logs or a real device test environment exists.
-- CI logic tests + APK build are NOT equivalent to real Wi-Fi multiplayer testing.
-- If a test fails, investigate and fix it rather than hand-waving.
+Current diagnostics include:
+- interface/IP logging;
+- active-network / Wi-Fi capabilities;
+- process binding attempts;
+- discovery TX/RX/reply logging;
+- TCP bind/listen/accept/connect logging;
+- HELLO / HELLO_ACK logging;
+- socket errors.
 
-## 3. Product philosophy / monetization
+Current network thread names include:
+- `ArenaDiscovery`
+- host thread
+- join thread
+- discovery responder thread.
 
-The base edition is intentionally a complete free game.
+## 5. Android local-network permissions
+Manifest currently includes:
+- `INTERNET`
+- `ACCESS_NETWORK_STATE`
+- `NEARBY_WIFI_DEVICES`
+- `ACCESS_LOCAL_NETWORK` (Android 17 / API 37)
 
-Free base edition:
-- no ads;
-- no artificial gameplay limits;
-- no energy/lives;
-- no waiting timers;
-- no crippled “demo” mechanics;
-- local multiplayer does not depend on monetization.
+Runtime requests were added for:
+- `NEARBY_WIFI_DEVICES` on Android 13+
+- `ACCESS_LOCAL_NETWORK` on Android 17+
 
-Future optional monetization:
-- 💖 Support the author — voluntary, any amount;
-- ⭐ Premium — optional skins, themes, effects and other cosmetic/additional content.
+Official Android documentation confirms that Android 16 local-network protections can affect raw TCP/UDP sockets, including outgoing/incoming TCP and UDP broadcast traffic. Android 17 requires `ACCESS_LOCAL_NETWORK` for apps targeting API 37+. Do not assume permissions alone solve this problem.
 
-Critical rule:
-**Premium is NOT a “remove ads” purchase.**
-The base version is already ad-free.
+## 6. Wi-Fi network binding
+`LocalNet` currently attempts to bind the process to an active Wi-Fi `Network` before:
+- host start;
+- join;
+- discovery.
 
-Current MVP:
-- payments are NOT connected;
-- billing is NOT connected;
-- paid content is NOT active;
-- no ad SDK;
-- store UI may show future placeholders.
+It restores the default process network on close.
 
-Do not reintroduce a `PREMIUM_NO_ADS` entitlement or `adsRemoved` logic unless product direction is explicitly changed.
+This is a diagnostic/compatibility measure, NOT proof that LAN routing works.
 
-## 4. Repository / release state
+## 7. Important current hypothesis
+The previous implementation relied heavily on IPv4 UDP broadcast for discovery.
 
-The project has GitHub Actions CI.
+Possible failure points must now be distinguished instead of blindly adding more permissions:
+1. Android local-network permission denied/restricted.
+2. Guest broadcast leaves the phone but host never receives it.
+3. Host receives discovery but guest never receives reply.
+4. Discovery succeeds but TCP 47821 is blocked.
+5. TCP connects but HELLO/HELLO_ACK fails.
+6. TCP handshake succeeds but the game-session protocol fails when host selects a game.
+7. Router/AP client isolation prevents phone-to-phone traffic.
+8. Xiaomi/HyperOS or Android network lifecycle changes the active network/socket behavior.
 
-Workflow:
-`.github/workflows/android.yml`
+A router with client/AP isolation cannot be fixed purely in Java TCP code. If isolation is confirmed, consider a Wi-Fi Direct/P2P fallback or another Android-supported local transport instead of endlessly changing TCP timeouts.
 
-CI currently:
-1. checkout;
-2. JDK 17;
-3. Gradle 9.6.1;
-4. JVM logic tests;
-5. debug APK build;
-6. upload APK artifact;
-7. for release commits, publish APK to GitHub Releases.
+## 8. NEXT DEBUGGING RULE
+Do NOT make another speculative network patch without first determining which stage fails.
 
-The project uses:
-- AGP 9.3.3
-- Gradle 9.6.1
-- Java 17 in CI
+The next agent should instrument or inspect the exact state transition and obtain evidence for:
+- host TCP LISTEN;
+- guest TCP CONNECT;
+- host ACCEPT;
+- HELLO sent;
+- HELLO_ACK received;
+- game-selection message sent;
+- guest receives game-selection message;
+- both sides enter the same game.
 
-Latest verified crash-fix release at the time of this handoff:
-**v0.1.0-build-71**
+If the UI says the host can select a game, that alone does NOT prove the guest has a live synchronized socket.
 
-Release:
-https://github.com/murasame-cmd/LocalArena/releases/tag/v0.1.0-build-71
+Add a visible connection-state diagnostic if necessary, e.g.:
+- DISCOVERY
+- TCP_CONNECTING
+- TCP_CONNECTED
+- HANDSHAKE
+- CONNECTED
+- GAME_SYNC
+- FAILED:<reason>
 
-APK:
-`LocalArena-v0.1.0-build-71.apk`
+Prefer a deterministic “connection self-test” (UDP probe + TCP probe + handshake) over another long timeout.
 
-Latest verified CI run:
-- workflow run: #71
-- result: success
-- purpose: crash-hardening build
-- tests + APK build passed.
+## 9. Physical test protocol
+The user must test on two real phones.
 
-Older known successful build:
-- run #45
-- commit: `ce6bbb2cc106f61ef5cf85998817f5bd921fa30b`
-- run ID: `36077517611`
-- result: success
-
-Do not assume build-71 is bug-free just because CI is green.
-
-## 5. Figma design
-
-Figma file:
-**Local Games — Chess • Sea Battle • Durak**
-
-file_key:
-`qkMoHCeSm9dg0jThZWZh7y`
-
-URL:
-https://www.figma.com/design/qkMoHCeSm9dg0jThZWZh7y
-
-The design contains screens for:
-- splash / brand;
-- main screen;
-- create room;
-- join room;
-- waiting for player;
-- connection errors;
-- chess gameplay/result;
-- sea battle setup/gameplay/result;
-- Durak gameplay/attack/defense/result;
-- game picker;
-- settings;
-- design system;
-- reconnect;
-- monetization/store;
-- monetization/settings;
-- game library/platform shell.
-
-Visual direction:
-- dark mobile UI;
-- game-specific accents;
-- reusable buttons/chips;
-- compact touch-friendly layouts;
-- game-specific boards/cards.
-
-Important design/code decisions:
-- Sea Battle MVP uses **automatic fleet placement**, not manual placement.
-- Chess currently auto-promotes to queen; there is no promotion dialog.
-- Some main-screen/game-picker/reconnect UX may still differ from the original Figma and needs QA.
-- Store design follows the finalized free/no-ads + future Premium model.
-
-## 6. Source structure
-
-Main Java files:
-- `app/src/main/java/com/localarena/MainActivity.java`
-- `app/src/main/java/com/localarena/LocalNet.java`
-- `app/src/main/java/com/localarena/ChessGame.java`
-- `app/src/main/java/com/localarena/SeaBattleGame.java`
-- `app/src/main/java/com/localarena/DurakGame.java`
-- `app/src/main/java/com/localarena/MonetizationState.java`
-- `app/src/main/java/com/localarena/MonetizationCatalog.java`
-
-Tests:
-- `app/src/test/java/com/localarena/LogicSimulationTest.java`
-
-## 7. Networking model
-
-The MVP uses TCP local networking.
-
-Expected flow:
-1. Host creates room.
-2. Host sees local IP / port.
-3. Guest enters host IP.
-4. Guest connects.
-5. Host selects game.
-6. Both clients receive synchronized game state.
-7. Game actions are sent over TCP.
-
-The game state must NEVER leak hidden opponent information.
-
-Sea Battle:
-- host keeps full state;
-- client receives masked opponent ships;
-- `encodeFor(viewer)` masks opponent ship cells;
-- `SEA_READY|player|grid` sends each player's own grid;
-- incoming grids are validated.
-
-Durak:
-- viewer receives their own hand;
-- opponent hand is masked as a count;
-- deck is masked as a count;
-- public attack/defense state remains visible.
-
-Chess:
-- client actions include player identity;
-- host validates that client actions come from player 1;
-- host validates whose turn it is.
-
-## 8. Important security / validation rules already implemented
-
-Do not remove these protections.
-
-### Chess
-- host validates client player ID;
-- move accepted only when it is black's turn for the guest;
-- king capture is prohibited by normal move generation;
-- castling is restricted to the king's home square;
-- en passant handling was fixed;
-- chess state serialization is tested.
-
-### Sea Battle
-- action validates player ID;
-- action validates turn;
-- coordinates are bounds checked;
-- duplicate shots are rejected;
-- winner state stops further shooting;
-- remote grids require exactly 100 cells;
-- only 0/1 are accepted for incoming ready grids;
-- fleet validity is checked;
-- fleet must be:
-  - 1×4
-  - 2×3
-  - 3×2
-  - 4×1
-- ships cannot touch;
-- ships must be straight;
-- hidden opponent ships are masked.
-
-### Durak
-- attack/defense actions are validated;
-- attack count is capped according to current defender hand and 6-card maximum;
-- taking with no uncovered attack cards is rejected;
-- turn changes are controlled by game logic;
-- both hands empty are handled as a draw;
-- trump is displayed by suit;
-- deck count is masked on clients.
-
-### Network parser
-Malformed network messages should be rejected safely:
-- length/prefix checks;
-- numeric parsing protection;
-- invalid Sea Battle grid length rejected;
-- exceptions must not crash the UI thread.
-
-## 9. Known recent crash investigation
-
-A physical test on a Xiaomi phone showed a system dialog:
-
-“В приложении "LocalArena" снова произошел сбой”
-
-The user reported the sequence:
-- host creates room;
-- after host chooses a game mode, the app crashes;
-- guest phone then shows:
-  **“Подключение: Connection reset”**
-  and waits for connection.
+For a clean test:
+1. Put both phones on the exact same Wi-Fi SSID.
+2. Disable mobile data temporarily if possible.
+3. Ensure Nearby devices / Local network permission is allowed.
+4. On phone A choose Host.
+5. On phone B choose Find Host or enter A's displayed IPv4 manually.
+6. Capture what each phone shows.
+7. If possible capture logcat filtered by:
+   - `LocalNet`
+   - `DISCOVERY_`
+   - `TCP_`
+   - `HELLO`
+   - `LocalArenaCrash`
 
 Interpretation:
-The guest's “Connection reset” is likely a consequence of the host-side failure/socket closing, not necessarily the root cause.
+- no DISCOVERY_RX on host -> discovery/network isolation issue;
+- DISCOVERY_REPLY but no TCP_CONNECT -> guest routing or TCP block;
+- TCP_CONNECT + no ACCEPT -> host/network issue;
+- ACCEPT + no HELLO_ACK -> handshake/protocol issue;
+- successful handshake + no GAME_SYNC -> application protocol bug;
+- GAME_SYNC on host but not guest -> message delivery/parser/UI state bug.
 
-The exact Android stack trace was NOT obtained.
+## 10. CI vs physical testing
+CI can verify:
+- JVM tests;
+- compilation;
+- APK packaging;
+- workflow/release.
 
-Do NOT claim the root cause was definitively proven.
+CI CANNOT prove:
+- two real phones can communicate over Wi-Fi;
+- router/AP isolation;
+- Xiaomi/HyperOS behavior;
+- actual Android permission state;
+- real socket routing;
+- physical disconnect/reconnect.
 
-The following hardening was implemented in build-71:
-1. Sea Battle fleet placement was made more crash-resistant.
-2. A deterministic valid fallback fleet was added.
-3. Sea Battle placement is stress-tested across many seeds.
-4. `startGame()` was guarded against runtime exceptions so unexpected initialization failures should return to a safe room/error state instead of immediately killing the app.
-5. CI was run again and succeeded.
-6. Release v0.1.0-build-71 was published.
+Always distinguish these.
 
-Next task should be to reproduce the exact physical crash if it still happens.
+## 11. Current code areas to inspect
+Priority:
+1. `LocalNet.java`
+2. `MainActivity.java`
+3. all protocol send/receive paths
+4. AndroidManifest
+5. `LogicSimulationTest.java`
+6. GitHub workflows
 
-## 10. Current Sea Battle implementation notes
+Potential UI issue:
+- the app may transition the host into game selection even though guest synchronization is incomplete. Audit the exact message/event that causes this transition.
 
-Sea Battle is currently automatic-placement MVP.
-
-`randomPlace()`:
-- attempts randomized placement;
-- validates fleet;
-- has a deterministic fallback layout;
-- should never fail just because random placement did not find a layout.
-
-`validFleet()` validates:
-- 10×10 board;
-- valid components;
-- max ship length 4;
-- no bent ships;
-- exact fleet composition;
-- no touching ships, including diagonal touching.
-
-If modifying this code:
-- preserve hidden-state behavior;
-- preserve serialization compatibility;
-- rerun tests.
-
-## 11. Current Durak implementation notes
-
-Durak is a simplified MVP, not yet a complete formal Russian Durak rules engine.
-
-Current mechanics include:
-- 6-card hands;
-- trump;
-- attack;
-- defense;
-- take;
-- pass/bito;
-- refill;
-- win/draw detection;
-- attack limit up to 6 and limited by defender's hand size.
-
-Still needs deeper audit for exact rules:
-- attack-after-take;
-- attacker/defender rotation;
-- exact refill order;
-- deck exhaustion;
-- all legal rank attack restrictions;
-- trump logic;
-- final winner logic;
-- post-defense turn ownership;
-- edge cases around empty hands/deck.
-
-Do not describe Durak as fully rules-complete yet.
-
-## 12. Current Chess implementation notes
-
-Chess engine has already received hardening:
-- en passant bug fixed;
-- castling home-square validation;
-- king capture prohibited;
-- serialization tests;
-- e2-e4 smoke test;
-- castling test;
-- en passant test.
-
-Known MVP limitation:
-- pawn promotion currently auto-promotes to queen;
-- no promotion selection UI.
-
-This is acceptable as an MVP only if documented; otherwise implement a promotion dialog and update Figma.
-
-## 13. UI / UX known issues
-
-Potential follow-up areas:
-- reconnect UX;
-- connection error UX;
-- waiting state;
-- main screen/game picker parity with Figma;
-- actual screen scaling on Xiaomi/Android;
-- touch targets;
-- back navigation;
-- result screens;
-- store/settings integration.
-
-Back navigation has been hardened:
-- Home → exit
-- Room → close network and Home
-- Picker → Room
-- game → Picker
-- other screens → Home
-
-## 14. Testing protocol
-
-Whenever making meaningful changes, follow this loop:
-
-### A. Static/code audit
-Inspect:
-- MainActivity;
-- LocalNet;
-- all three game engines;
-- serialization;
-- network action validation;
-- lifecycle/back navigation.
-
-### B. Logic simulation
-Run:
-`gradle :app:testDebugUnitTest --stacktrace`
-
-### C. APK build
-Run:
-`gradle :app:assembleDebug --stacktrace`
-
-### D. CI
-Push/commit and verify GitHub Actions:
-- test step passes;
-- APK build passes;
-- artifact exists;
-- if release commit, Release exists and contains APK.
-
-### E. Physical two-phone test
-Must be treated separately from CI.
-
-For each game:
-1. Host creates room.
-2. Guest connects.
-3. Host chooses game.
-4. Both screens transition correctly.
-5. Play a complete or representative game.
-6. Test invalid actions.
-7. Test back navigation.
-8. Test disconnect/reconnect behavior.
-9. Repeat with host/guest roles swapped where practical.
-
-If a physical test fails:
-- capture Android crash dialog;
-- ideally get logcat/stack trace;
-- identify exact failing method;
-- fix;
-- add a regression test;
-- rebuild.
-
-## 15. Critical distinction: CI vs real device testing
-
-CI proves:
-- Java logic tests pass;
-- project compiles;
-- APK can be packaged;
-- release workflow works.
-
-CI does NOT prove:
-- two real Android phones can connect;
-- Wi-Fi routing works on every device;
-- Xiaomi/HyperOS lifecycle behavior is correct;
-- socket handling survives real disconnects;
-- UI is correct on all screen sizes;
-- Android permissions/network settings behave correctly.
-
-Always state this distinction.
-
-## 16. Release workflow
-
-The workflow is designed so commits whose message contains:
-`[release]`
-
-publish a GitHub Release with the generated APK.
-
-A release should include:
-- APK asset;
-- concise changelog;
-- build/test status.
-
-The repository README should keep a direct link to:
-https://github.com/murasame-cmd/LocalArena/releases/latest
-
-## 17. Do not regress these product rules
-
-Never:
-- add ads to the base MVP;
-- make Premium remove ads;
-- add gameplay energy/lives/waiting timers;
-- require payment to play;
-- leak hidden opponent information;
-- accept arbitrary client actions without validation;
-- claim physical multiplayer testing was performed when it was not;
-- claim a bug is fixed without running a relevant test/build.
-
-## 18. Immediate next priorities
-
-Recommended order:
-
-### Priority 1 — reproduce the real Xiaomi crash
-The most important open issue is the physical crash when the host chooses a game after a guest connects.
-
-Get:
-- exact reproduction;
-- Android version/device;
-- stack trace/logcat if possible.
-
-Test all three:
-- Chess;
-- Sea Battle;
-- Durak.
-
-### Priority 2 — network lifecycle audit
-Audit `LocalNet` for:
-- socket closing;
-- accept thread;
-- reader thread;
-- partial messages;
-- duplicate connections;
+Also audit:
+- partial TCP reads;
+- newline/message framing;
 - stale sockets;
-- disconnect;
-- reconnect;
-- UI-thread safety;
-- exceptions.
+- duplicate reader threads;
+- socket close races;
+- UI callbacks after network close;
+- exceptions swallowed by empty catches;
+- host/guest role state.
 
-### Priority 3 — complete game-rule audit
-Especially Durak.
+## 12. Game-state security rules
+Preserve existing protections:
+- Chess: validate player identity/turn; no king capture; serialization tests.
+- Sea Battle: validate player/turn/coordinates/duplicate shots; validate 100-cell grids and fleet; mask hidden ships.
+- Durak: validate attack/defense/take/pass/turn/card limits; mask opponent hand and deck.
 
-### Priority 4 — UI/Figma audit
-Compare actual screens against:
-https://www.figma.com/design/qkMoHCeSm9dg0jThZWZh7y
+Do not leak hidden opponent state.
 
-### Priority 5 — improve release process
-Keep GitHub Releases as the simple APK download path.
+## 13. Product rules
+Base game is free and ad-free.
+Do NOT add:
+- ads;
+- energy/lives;
+- waiting timers;
+- pay-to-play;
+- Premium-as-ad-removal.
 
-## 19. Useful links
+Future optional monetization:
+- voluntary support;
+- cosmetic/additional Premium content.
 
-Repository:
-https://github.com/murasame-cmd/LocalArena
+## 14. Release / CI
+Current workflows:
+- `.github/workflows/android.yml`
+- `.github/workflows/release.yml`
 
-Releases:
-https://github.com/murasame-cmd/LocalArena/releases
+Recent verified successful build:
+- Android APK workflow #104
+- Release workflow #45
+- commit: `982c2f406648bd5052aff594085439c4ecc5f349`
+- release tag: `v0.1.0-build-104`
 
-Latest release at handoff:
-https://github.com/murasame-cmd/LocalArena/releases/tag/v0.1.0-build-71
+This proves code/tests/build/release succeeded, NOT physical LAN multiplayer.
 
-Figma:
-https://www.figma.com/design/qkMoHCeSm9dg0jThZWZh7y
+Before claiming a newer release, verify GitHub current state.
 
-## 20. Handoff instruction to the next agent
+## 15. Known recent network commits
+Relevant recent changes:
+- `1a9845229dcf44fa1790c6a4c738073244e0bfe6` — cleartext local transport setting
+- `b9f43cdda75f636c44769c48e212f3b476f733dd` — Nearby Wi-Fi permission
+- `1b208f012261bf1d29e841d5bec8d2b50694560f` — nearby-devices permission
+- `676410d527174664e5431215129e891d867d8b2a` — bind LAN sockets to Wi-Fi
+- `de2881a05432dde3c3880fb88767db9c4355e134` — restore default network
+- `38ceb4952cbaffdd7c9eafce370d8caa171217ed` — Android 17 local-network permission
+- `129d2bc3b7decf81084b775f44b086da75e3238c` — Android 17 runtime request
+- `982c2f406648bd5052aff594085439c4ecc5f349` — restore host address callback; build #104 passed
 
-Start by reading this file and then inspect the current repository state.
+A previous build failure was caused by a missing `postHostAddress()` callback; this is fixed and build #104 passed.
 
-Do NOT assume the historical summaries above are still perfectly synchronized with HEAD. Verify:
-- current commit;
-- current workflow;
-- current releases;
-- current source files;
-- current tests.
+## 16. Icon state
+Launcher artwork was replaced with the supplied LocalArena artwork.
+Important historical issue:
+- an adaptive-icon XML accidentally referenced `@mipmap/ic_launcher` recursively;
+- that XML was removed;
+- legacy `mipmap-xxxhdpi/ic_launcher.webp` remains.
 
-Then continue from the highest-priority open issue:
-**real two-phone multiplayer crash / connection-reset investigation.**
+If the launcher still shows the Android robot on a real device, inspect the final APK resource table instead of assuming the icon is fixed.
 
-The user expects the agent to proactively fix discovered bugs, commit them, run tests, build an APK, and update the GitHub Release when appropriate.
+## 17. Figma
+Figma file:
+`qkMoHCeSm9dg0jThZWZh7y`
 
-When reporting progress, distinguish clearly between:
-- verified by code/tests;
-- verified by GitHub Actions;
-- verified on a real device by the user.
+No Figma visual update should be claimed unless a real Figma mutation was performed.
+
+## 18. Required agent behavior
+When opening a new chat:
+1. read this AGENT.md;
+2. verify HEAD/current branch;
+3. inspect current `LocalNet.java` and `MainActivity.java`;
+4. inspect latest CI/release;
+5. reproduce/trace the connection state before patching;
+6. fix the highest-confidence root cause;
+7. commit every meaningful logical change;
+8. run tests/build;
+9. verify CI;
+10. ask the user for the smallest useful physical test result/log if a real-device step remains.
+
+The immediate goal is NOT “another green build”.
+The immediate goal is:
+**prove exactly where the two-phone connection breaks, then fix that stage.**
