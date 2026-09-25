@@ -57,12 +57,22 @@ jobs:
           name: LocalArena-debug
           path: app/build/outputs/apk/debug/LocalArena.apk
 
-      - name: Publish GitHub Release
+      - name: Publish latest release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: latest
           name: LocalArena — Latest
           prerelease: true
           make_latest: true
+          generate_release_notes: true
+          files: app/build/outputs/apk/debug/LocalArena.apk
+
+      - name: Publish build-tagged release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v0.1.0-build-${{ github.run_number }}
+          name: LocalArena v0.1.0-build-${{ github.run_number }}
+          prerelease: false
+          make_latest: false
           generate_release_notes: true
           files: app/build/outputs/apk/debug/LocalArena.apk
