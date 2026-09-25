@@ -1,5 +1,9 @@
 name: Android APK
 
+concurrency:
+  group: localarena-main
+  cancel-in-progress: true
+
 on:
   push:
     branches: [main]
@@ -33,12 +37,15 @@ jobs:
         run: gradle :app:assembleDebug --stacktrace
 
       - name: Run emulator smoke tests
+        timeout-minutes: 10
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: 35
           target: google_apis
           arch: x86_64
           profile: pixel_2
+          emulator-options: -no-window -no-boot-anim -noaudio
+          disable-animations: true
           script: gradle :app:connectedDebugAndroidTest --stacktrace
 
       - name: Prepare release APK
