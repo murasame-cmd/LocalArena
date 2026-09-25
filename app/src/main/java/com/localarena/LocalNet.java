@@ -45,6 +45,7 @@ final class LocalNet {
  volatile Socket socket;
  volatile DatagramSocket discoverySocket;
  volatile boolean closing=true;
+  volatile long generation=0;
 
  BufferedReader in;
  PrintWriter out;
@@ -58,6 +59,7 @@ final class LocalNet {
  void host(){
   close();
   closing=false;
+  final long runId=generation;
   new Thread(()->{
    try{
     logNetworkEnvironment("HOST_START");
@@ -70,27 +72,27 @@ final class LocalNet {
 
     String hostIp=localIp();
     log("HOST_LISTENING ip="+hostIp+" port="+PORT);
-    postHostAddress(hostIp);
-    postStatus("Сервер запущен. Ждём второго игрока…");
+    postHostAddress(runId,hostIp);
+    postStatus(runId,"Сервер запущен. Ждём второго игрока…");
 
     Socket s=ss.accept();
-    if(closing){safeClose(s);return;}
+    if(!active(runId)){safeClose(s);return;}
 
     log("HOST_ACCEPTED remote="+s.getRemoteSocketAddress());
     setup(s);
     handshake(true);
 
-    postConnected(true,hostIp);
-    postStatus("🟢 Телефон подключён");
-    readLoop();
+    postConnected(runId,true,hostIp);
+    postStatus(runId,"🟢 Телефон подключён");
+    readLoop(runId);
    }catch(BindException e){
     logException("HOST_BIND_FAILED",e);
-    if(!closing)postError("Хост: не удалось открыть порт "+PORT+". Попробуй закрыть старую комнату и создать её заново.");
+    if(active(runId))postError(runId,"Хост: не удалось открыть порт "+PORT+". Попробуй закрыть старую комнату и создать её заново.");
    }catch(Exception e){
     logException("HOST_ERROR",e);
-    if(!closing)postError("Хост: "+safeMessage(e));
+    if(active(runId))postError(runId,"Хост: "+safeMessage(e));
    }finally{
-    if(!closing)close();
+    if(generation==runId)close();
    }
   },"ArenaHost").start();
  }
@@ -98,6 +100,7 @@ final class LocalNet {
  void join(String address){
   close();
   closing=false;
+  final long runId=generation;
   final String target=address==null?"":address.trim();
 
   new Thread(()->{
@@ -107,7 +110,7 @@ final class LocalNet {
     }
 
     logNetworkEnvironment("JOIN_START target="+target);
-    postStatus("Подключение к "+target+"…");
+    postStatus(runId,"Подключение к "+target+"…");
 
     Socket s=new Socket();
     s.setTcpNoDelay(true);
@@ -118,20 +121,20 @@ final class LocalNet {
     setup(s);
     handshake(false);
 
-    postConnected(false,target);
-    postStatus("🟢 Соединение установлено");
+    postConnected(runId,false,target);
+    postStatus(runId,"🟢 Соединение установлено");
     readLoop();
    }catch(ConnectException e){
     logException("JOIN_REFUSED",e);
-    if(!closing)postError("Подключение отклонено. Проверь IP хоста, одну Wi‑Fi сеть и отсутствие изоляции клиентов.");
+    if(active(runId))postError(runId,"Подключение отклонено. Проверь IP хоста, одну Wi‑Fi сеть и отсутствие изоляции клиентов.");
    }catch(SocketTimeoutException e){
     logException("JOIN_TIMEOUT",e);
-    if(!closing)postError("Не удалось подключиться за 10 секунд. Проверь IP и сеть.");
+    if(active(runId))postError(runId,"Не удалось подключиться за 10 секунд. Проверь IP и сеть.");
    }catch(Exception e){
     logException("JOIN_ERROR",e);
-    if(!closing)postError("Подключение: "+safeMessage(e));
+    if(active(runId))postError(runId,"Подключение: "+safeMessage(e));
    }finally{
-    if(!closing)close();
+    if(generation==runId)close();
    }
   },"ArenaJoin").start();
  }
@@ -139,6 +142,7 @@ final class LocalNet {
  void discover(){
   close();
   closing=false;
+  final long runId=generation;
 
   new Thread(()->{
    Set<String> found=new LinkedHashSet<>();
@@ -154,7 +158,7 @@ final class LocalNet {
     byte[] request=DISCOVERY_REQUEST.getBytes(StandardCharsets.UTF_8);
 
     for(InterfaceEndpoint ep:endpoints){
-     if(closing)break;
+     if(!active(runId))break;
 
      try(DatagramSocket ds=new DatagramSocket(null)){
       ds.setReuseAddress(true);
@@ -184,8 +188,8 @@ final class LocalNet {
         log("DISCOVERY_RX from="+sender+" msg="+msg);
 
         if(msg.startsWith(DISCOVERY_RESPONSE+"|") && found.add(sender)){
-         postDiscovered(sender);
-         postStatus("Найден хост: "+sender);
+         postDiscovered(runId,sender);
+         postStatus(runId,"Найден хост: "+sender);
          return;
         }
        }catch(SocketTimeoutException ignored){}
@@ -195,17 +199,18 @@ final class LocalNet {
      }
     }
 
-    if(!closing){
+    if(active(runId)){
      postError("Автопоиск не нашёл хост. Введи IP хоста вручную — это основной fallback.");
     }
    }catch(Exception e){
     logException("DISCOVERY_ERROR",e);
-    if(!closing)postError("Поиск хоста: "+safeMessage(e));
+    if(active(runId))postError(runId,"Поиск хоста: "+safeMessage(e));
    }
   },"ArenaDiscovery").start();
  }
 
  void startDiscoveryResponder(){
+  final long runId=generation;
   new Thread(()->{
    try{
     DatagramSocket ds=new DatagramSocket(null);
@@ -217,7 +222,7 @@ final class LocalNet {
 
     log("DISCOVERY_LISTENING port="+DISCOVERY_PORT);
 
-    while(!closing){
+    while(active(runId)){
      try{
       byte[] buf=new byte[256];
       DatagramPacket p=new DatagramPacket(buf,buf.length);
@@ -234,7 +239,7 @@ final class LocalNet {
       log("DISCOVERY_REPLY to="+p.getAddress().getHostAddress()+" response="+response);
      }catch(SocketTimeoutException ignored){}
      catch(SocketException e){
-      if(!closing)logException("DISCOVERY_SOCKET_ERROR",e);
+      if(active(runId))logException("DISCOVERY_SOCKET_ERROR",e);
       break;
      }
     }
@@ -286,22 +291,22 @@ final class LocalNet {
   log("HANDSHAKE_OK side="+(hostSide?"HOST":"GUEST"));
  }
 
- void readLoop()throws IOException{
+ void readLoop(long runId)throws IOException{
   log("READ_LOOP_START");
 
   String line;
-  while(!closing && (line=in.readLine())!=null){
+  while(active(runId) && (line=in.readLine())!=null){
    final String message=line;
    if(message.length()>8192){
     log("RX_REJECT_TOO_LONG len="+message.length());
     continue;
    }
    log("RX "+message);
-   main.post(()->listener.line(message));
+   main.post(()->{if(active(runId))listener.line(message);});
   }
 
-  if(!closing){
-   postError("Соединение закрыто");
+  if(active(runId)){
+   postError(runId,"Соединение закрыто");
    log("READ_EOF");
   }
  }
@@ -328,6 +333,7 @@ final class LocalNet {
  }
 
  synchronized void close(){
+  generation++;
   boolean wasOpen=!closing || socket!=null || server!=null || discoverySocket!=null;
   closing=true;
 
@@ -356,12 +362,12 @@ final class LocalNet {
   try{s.close();}catch(Exception ignored){}
  }
 
- void postConnected(boolean h,String ip){main.post(()->listener.connected(h,ip));}
- void postStatus(String s){main.post(()->listener.status(s));}
- void postError(String s){main.post(()->listener.error(s));}
- void postDiscovered(String ip){main.post(()->listener.discovered(ip));}
- void postHostAddress(String ip){main.post(()->listener.hostAddress(ip));}
-
+ boolean active(long id){return !closing && generation==id;}
+ void postConnected(long id,boolean h,String ip){main.post(()->{if(active(id))listener.connected(h,ip);});}
+ void postStatus(long id,String s){main.post(()->{if(active(id))listener.status(s);});}
+ void postError(long id,String s){main.post(()->{if(active(id))listener.error(s);});}
+ void postDiscovered(long id,String ip){main.post(()->{if(active(id))listener.discovered(ip);});}
+ void postHostAddress(long id,String ip){main.post(()->{if(active(id))listener.hostAddress(ip);});}
  void log(String s){Log.d(TAG,s);}
  void logException(String stage,Exception e){Log.e(TAG,stage+" type="+e.getClass().getSimpleName()+" message="+safeMessage(e),e);}
  String safeMessage(Exception e){String m=e.getMessage();return m==null?e.getClass().getSimpleName():m;}
