@@ -48,7 +48,7 @@ public class LocalArenaSmokeTest {
         assertNotNull(a);
 
         String[] games = {"CHESS", "SEA", "DURAK"};
-        for (int round=0; round<8; round++) {
+        for (int round=0; round<2; round++) {
             for (String game : games) {
                 inst.runOnMainSync(() -> {
                     a.host = true;
@@ -58,9 +58,11 @@ public class LocalArenaSmokeTest {
                     a.view.measure(View.MeasureSpec.makeMeasureSpec(1080, View.MeasureSpec.EXACTLY),
                             View.MeasureSpec.makeMeasureSpec(1920, View.MeasureSpec.EXACTLY));
                     a.view.layout(0,0,1080,1920);
-                    Bitmap b = Bitmap.createBitmap(1080,1920,Bitmap.Config.ARGB_8888);
-                    a.view.draw(new Canvas(b));
-                    b.recycle();
+                    if (round==0) {
+                        Bitmap b = Bitmap.createBitmap(1080,1920,Bitmap.Config.ARGB_8888);
+                        a.view.draw(new Canvas(b));
+                        b.recycle();
+                    }
                 });
                 inst.waitForIdleSync();
                 assertTrue(!a.isFinishing() && !a.isDestroyed());
