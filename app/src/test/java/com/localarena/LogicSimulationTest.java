@@ -50,6 +50,8 @@ public class LogicSimulationTest {
         String encoded=s.encodeFor(1);
         String[] encodedParts=encoded.split("\\|",-1);
         assertEquals(3,encodedParts.length);
+        assertEquals("0,-1,1,1",encodedParts[0]);
+        for(int i=1;i<3;i++)for(int j=0;j<encodedParts[i].length();j++)assertTrue(encodedParts[i].charAt(j)>='0'&&encodedParts[i].charAt(j)<='3');
         assertEquals(100,encodedParts[1].length());
         assertEquals(100,encodedParts[2].length());
         SeaBattleGame replica=new SeaBattleGame();
