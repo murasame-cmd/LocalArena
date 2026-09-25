@@ -49,7 +49,7 @@ public class LocalArenaSmokeTest {
         assertNotNull(a);
 
         String[] games = {"CHESS", "SEA", "DURAK"};
-        for (int round=0; round<2; round++) {
+        for (int round=0; round<2; round++) {\n            final int currentRound = round;
             for (String game : games) {
                 inst.runOnMainSync(() -> {
                     a.host = true;
@@ -59,7 +59,7 @@ public class LocalArenaSmokeTest {
                     a.view.measure(View.MeasureSpec.makeMeasureSpec(1080, View.MeasureSpec.EXACTLY),
                             View.MeasureSpec.makeMeasureSpec(1920, View.MeasureSpec.EXACTLY));
                     a.view.layout(0,0,1080,1920);
-                    if (round==0) {
+                    if (currentRound==0) {
                         Bitmap b = Bitmap.createBitmap(1080,1920,Bitmap.Config.ARGB_8888);
                         a.view.draw(new Canvas(b));
                         b.recycle();
@@ -85,8 +85,8 @@ public class LocalArenaSmokeTest {
                 } else if (game.equals("SEA")) {
                     final int[] target = {0,0};
                     inst.runOnMainSync(() -> {
-                        a.sea.randomPlace(0, round+1L);
-                        a.sea.randomPlace(1, round+2L);
+                        a.sea.randomPlace(0, currentRound+1L);
+                        a.sea.randomPlace(1, currentRound+2L);
                         a.sea.ready[0]=a.sea.ready[1]=true;
                         outer: for(int yy=0;yy<10;yy++) for(int xx=0;xx<10;xx++) if(a.sea.cells[1][yy][xx]==1){target[0]=xx;target[1]=yy;break outer;}
                         float top=135*a.view.d,gap=34*a.view.d,bottom=28*a.view.d;
