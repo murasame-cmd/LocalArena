@@ -39,6 +39,7 @@ final class LocalNet {
  void host(){
   close(); closing=false;
   new Thread(()->{
+   bindToWifiNetwork("HOST_START");
    logNetworkEnvironment("HOST_START");
    startDiscoveryResponder();
    try{
@@ -76,6 +77,7 @@ final class LocalNet {
   close(); closing=false;
   final String target=ip==null?"":ip.trim();
   new Thread(()->{
+   bindToWifiNetwork("JOIN_START target="+target);
    logNetworkEnvironment("JOIN_START target="+target);
    try{
     postStatus("Подключение к "+target+"…");
@@ -104,6 +106,7 @@ final class LocalNet {
  void discover(){
   close(); closing=false;
   new Thread(()->{
+   bindToWifiNetwork("DISCOVERY_START");
    logNetworkEnvironment("DISCOVERY_START");
    Set<String> found=new LinkedHashSet<>();
    try{
@@ -162,6 +165,30 @@ final class LocalNet {
     if(!closing)postError("Поиск хоста: "+safeMessage(e));
    }
   },"ArenaDiscovery").start();
+ }
+
+ void bindToWifiNetwork(String reason){
+  try{
+   ConnectivityManager cm=(ConnectivityManager)appContext.getSystemService(Context.CONNECTIVITY_SERVICE);
+   Network active=cm.getActiveNetwork();
+   Network wifi=null;
+   if(active!=null){
+    NetworkCapabilities caps=cm.getNetworkCapabilities(active);
+    if(caps!=null&&caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI))wifi=active;
+   }
+   if(wifi==null){
+    for(Network n:cm.getAllNetworks()){
+     NetworkCapabilities caps=cm.getNetworkCapabilities(n);
+     if(caps!=null&&caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI)){
+      wifi=n;break;
+     }
+    }
+   }
+   if(wifi!=null){
+    boolean ok=cm.bindProcessToNetwork(wifi);
+    log("WIFI_BIND reason="+reason+" network="+wifi+" ok="+ok);
+   }else log("WIFI_BIND reason="+reason+" no_wifi_network");
+  }catch(Exception e){logException("WIFI_BIND_ERROR reason="+reason,e);}
  }
 
  void startDiscoveryResponder(){
