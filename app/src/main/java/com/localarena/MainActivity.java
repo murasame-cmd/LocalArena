@@ -4,7 +4,7 @@ import android.app.*;import android.os.*;import android.graphics.*;import androi
 
 public class MainActivity extends Activity implements LocalNet.Listener{
  enum Screen{HOME,ROOM,PICKER,STORE,SETTINGS,CHESS,SEA,DURAK} Screen screen=Screen.HOME; LocalNet net; boolean host=false,connected=false; String ip=""; int me=0; String selectedGame=""; MonetizationState monetization=new MonetizationState(); ChessGame chess=new ChessGame(); SeaBattleGame sea=new SeaBattleGame(); DurakGame durak=new DurakGame(); ArenaView view;
- @Override public void onCreate(Bundle b){super.onCreate(b);getWindow().setStatusBarColor(Color.rgb(11,13,16));getWindow().setNavigationBarColor(Color.rgb(11,13,16));net=new LocalNet(new Handler(Looper.getMainLooper()),this);monetization.load(this);show(Screen.HOME);}
+ @Override public void onCreate(Bundle b){super.onCreate(b); final Thread.UncaughtExceptionHandler previousCrashHandler=Thread.getDefaultUncaughtExceptionHandler(); Thread.setDefaultUncaughtExceptionHandler((thread,error)->{Log.e("LocalArenaCrash","UNCAUGHT thread="+thread.getName(),error);if(previousCrashHandler!=null)previousCrashHandler.uncaughtException(thread,error);}); if(Build.VERSION.SDK_INT>=33)getOnBackInvokedDispatcher().registerOnBackInvokedCallback(0,()->navigateBack()); getWindow().setStatusBarColor(Color.rgb(11,13,16));getWindow().setNavigationBarColor(Color.rgb(11,13,16));net=new LocalNet(new Handler(Looper.getMainLooper()),this);monetization.load(this);show(Screen.HOME);}
  void show(Screen s){screen=s;view=new ArenaView(this);setContentView(view);}
  void host(){host=true;me=0;ip=LocalNet.localIp();show(Screen.ROOM);net.host();}
  void join(String addr){if(addr==null||addr.trim().isEmpty()){Toast.makeText(this,"Введи IP хоста",Toast.LENGTH_SHORT).show();return;}host=false;me=1;ip=addr.trim();show(Screen.ROOM);net.join(ip);}
@@ -18,6 +18,7 @@ public class MainActivity extends Activity implements LocalNet.Listener{
  @Override public void status(String s){if(view!=null)view.message=s;view.invalidate();}
  @Override public void error(String e){connected=false;if(view!=null){view.message=e;view.invalidate();}}
  @Override public void line(String line){
+  Log.d("LocalArenaNet","MAIN_RX "+line);
   try{
    if(line.startsWith("GAME|")){String g=line.substring(5);if(g.equals("CHESS")||g.equals("SEA")||g.equals("DURAK"))startGame(g);return;}
    if(line.startsWith("SEA_READY|")){String[]a=line.split("\\|",-1);if(host&&a.length==3&&a[1].equals("1")&&a[2].length()==100&&applyGrid(1,a[2])){if(sea.ready[0]&&sea.ready[1])broadcastSea();}return;}
@@ -28,14 +29,17 @@ public class MainActivity extends Activity implements LocalNet.Listener{
     return;
    }
    if(line.startsWith("STATE|")){String[]a=line.split("\\|",3);if(a.length<3)return;if(a[1].equals("CHESS")){chess.decode(a[2]);show(Screen.CHESS);}else if(a[1].equals("SEA")){sea.decode(a[2]);show(Screen.SEA);}else if(a[1].equals("DURAK")){durak.decode(a[2]);show(Screen.DURAK);}}
-  }catch(Exception ignored){}
+  }catch(Exception e){Log.e("LocalArenaNet","MAIN_PROTOCOL_ERROR line="+line,e);if(view!=null){view.message="Ошибка протокола: "+e.getClass().getSimpleName();view.invalidate();}}
  }
  boolean handleDurak(String[]a){try{String action=a[2];int p=Integer.parseInt(a[3]);if(action.equals("ATTACK"))return durak.addAttack(p,Integer.parseInt(a[4]));if(action.equals("DEFEND"))return durak.defend(p,Integer.parseInt(a[4]),Integer.parseInt(a[5]));if(action.equals("PASS"))return durak.passAttack(p);if(action.equals("TAKE"))return durak.take(p);}catch(Exception ignored){}return false;}
  void chessAction(int from,int to){if(chess.result!=' '||chess.white!=(me==0)||from<0||from>=64||to<0||to>=64)return;if(host){if(chess.move(new ChessGame.Move(from,to,(char)0)))broadcastChess();}else net.send("ACTION|CHESS|1|"+from+","+to+",");}
  void seaAction(int x,int y){if(sea.winner>=0||sea.turn!=(me==0)||!sea.ready[0]||!sea.ready[1])return;if(host){if(sea.shoot(me,x,y))broadcastSea();}else net.send("ACTION|SEA|1|"+x+"|"+y);}
  void durakAction(String action,int a,int b){if(host){if(handleDurak(new String[]{"ACTION","DURAK",action,String.valueOf(me),String.valueOf(a),String.valueOf(b)}))broadcastDurak();}else net.send("ACTION|DURAK|"+action+"|1|"+a+"|"+b);}
- @Override public void onBackPressed(){if(screen==Screen.HOME){super.onBackPressed();return;}if(screen==Screen.ROOM){net.close();connected=false;show(Screen.HOME);return;}if(screen==Screen.PICKER){show(Screen.ROOM);return;}if(screen==Screen.CHESS||screen==Screen.SEA||screen==Screen.DURAK){show(Screen.PICKER);return;}show(Screen.HOME);}@Override protected void onDestroy(){net.close();super.onDestroy();}
+ void navigateBack(){Log.d("LocalArenaUI","BACK screen="+screen);if(screen==Screen.HOME){super.onBackPressed();return;}if(screen==Screen.ROOM){net.close();connected=false;show(Screen.HOME);return;}if(screen==Screen.PICKER){show(Screen.ROOM);return;}if(screen==Screen.CHESS||screen==Screen.SEA||screen==Screen.DURAK){show(Screen.PICKER);return;}show(Screen.HOME);}
+ @Override public void onBackPressed(){navigateBack();}
+ @Override protected void onDestroy(){net.close();super.onDestroy();}
  final class ArenaView extends View{
+  float edgeStartX=-1,edgeStartY=-1;
   Paint p=new Paint(3);String message="Подготовка…";int sel=-1;float d;int bg=Color.rgb(11,13,16),panel=Color.rgb(22,25,31),text=Color.rgb(240,243,247),muted=Color.rgb(154,163,173);
   ArenaView(Context c){super(c);d=getResources().getDisplayMetrics().density;setBackgroundColor(bg);}
   void rect(Canvas c,float l,float t,float r,float b,int col,float rad){p.setColor(col);c.drawRoundRect(l,t,r,b,rad,rad,p);}void txt(Canvas c,String s,float x,float y,float size,int col){p.setTextSize(size*d);p.setColor(col);c.drawText(s,x,y,p);}void center(Canvas c,String s,float x,float y,float size,int col){p.setTextSize(size*d);p.setColor(col);c.drawText(s,x-p.measureText(s)/2,y,p);}
