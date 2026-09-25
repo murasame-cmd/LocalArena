@@ -151,7 +151,7 @@ final class LocalNet {
     log("DISCOVERY_INTERFACES "+endpoints);
 
     if(endpoints.isEmpty()){
-     postError("Поиск хоста: не найден активный IPv4-интерфейс.");
+     postError(runId,"Поиск хоста: не найден активный IPv4-интерфейс.");
      return;
     }
 
