@@ -15,6 +15,7 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
+    timeout-minutes: 25
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -37,16 +38,21 @@ jobs:
         run: gradle :app:assembleDebug --stacktrace
 
       - name: Run emulator smoke tests
-        timeout-minutes: 10
+        timeout-minutes: 15
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: 35
           target: google_apis
           arch: x86_64
           profile: pixel_2
-          emulator-options: -no-window -no-boot-anim -noaudio
+          cores: 2
+          ram-size: 2048M
+          heap-size: 512M
+          disk-size: 6000M
+          emulator-boot-timeout: 300
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
           disable-animations: true
-          script: gradle :app:connectedDebugAndroidTest --stacktrace
+          script: gradle :app:connectedDebugAndroidTest --no-daemon --stacktrace
 
       - name: Prepare release APK
         run: cp app/build/outputs/apk/debug/app-debug.apk app/build/outputs/apk/debug/LocalArena.apk

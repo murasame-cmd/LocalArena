@@ -118,10 +118,8 @@ final class LocalNet {
     s.connect(new InetSocketAddress(target,PORT),CONNECT_TIMEOUT_MS);
 
     log("JOIN_CONNECTED remote="+s.getRemoteSocketAddress()+" local="+s.getLocalSocketAddress());
-    if(!active(runId)){safeClose(s);return;}
     setup(s);
     handshake(false);
-    if(!active(runId)){safeClose(s);return;}
 
     postConnected(runId,false,target);
     postStatus(runId,"🟢 Соединение установлено");

@@ -13,7 +13,7 @@ import org.junit.Test;
 import static org.junit.Assert.*;
 
 public class LocalArenaSmokeTest {
-    @Test public void allGameScreensOpenAndRender() throws Exception {
+    @Test(timeout=120000) public void allGameScreensOpenAndRender() throws Exception {
         Instrumentation inst = InstrumentationRegistry.getInstrumentation();
         try { inst.getUiAutomation().grantRuntimePermission(inst.getTargetContext().getPackageName(), Manifest.permission.NEARBY_WIFI_DEVICES); } catch (Exception ignored) {}
         Intent intent = new Intent(inst.getTargetContext(), MainActivity.class);
@@ -83,25 +83,25 @@ public class LocalArenaSmokeTest {
                         a.view.onTouchEvent(u); u.recycle();
                     });
                 } else if (game.equals("SEA")) {
+                    final int[] target = {0,0};
                     inst.runOnMainSync(() -> {
                         a.sea.randomPlace(0, round+1L);
                         a.sea.randomPlace(1, round+2L);
                         a.sea.ready[0]=a.sea.ready[1]=true;
-                        int targetX=0,targetY=0;
-                        outer: for(int yy=0;yy<10;yy++) for(int xx=0;xx<10;xx++) if(a.sea.cells[1][yy][xx]==1){targetX=xx;targetY=yy;break outer;}
+                        outer: for(int yy=0;yy<10;yy++) for(int xx=0;xx<10;xx++) if(a.sea.cells[1][yy][xx]==1){target[0]=xx;target[1]=yy;break outer;}
                         float top=135*a.view.d,gap=34*a.view.d,bottom=28*a.view.d;
                         float size=Math.min(a.view.getWidth()-48*a.view.d,(a.view.getHeight()-top-gap-bottom)/2f);
                         float left=(a.view.getWidth()-size)/2f;
                         float cell=size/10f;
-                        float y=top+size+gap+(targetY+0.5f)*cell;
-                        float x=left+(targetX+0.5f)*cell;
+                        float y=top+size+gap+(target[1]+0.5f)*cell;
+                        float x=left+(target[0]+0.5f)*cell;
                         long t=System.currentTimeMillis();
                         MotionEvent d=MotionEvent.obtain(t,t,MotionEvent.ACTION_DOWN,x,y,0);
                         a.view.onTouchEvent(d); d.recycle();
                         MotionEvent u=MotionEvent.obtain(t,t+5,MotionEvent.ACTION_UP,x,y,0);
                         a.view.onTouchEvent(u); u.recycle();
                     });
-                    assertEquals("Sea tap must reach the drawn enemy cell",3,a.sea.cells[1][targetY][targetX]);
+                    assertEquals("Sea tap must reach the drawn enemy cell",3,a.sea.cells[1][target[1]][target[0]]);
                 } else {
                     inst.runOnMainSync(() -> {
                         if (!a.durak.hand[0].isEmpty()) {
@@ -117,11 +117,13 @@ public class LocalArenaSmokeTest {
                 }
                 inst.waitForIdleSync();
                 assertTrue("Interaction must not destroy activity: "+game,!a.isFinishing() && !a.isDestroyed());
-                a.line("STATE|CHESS|bad");
-                a.line("STATE|SEA|bad");
-                a.line("STATE|DURAK|bad");
-                a.line("ACTION|BAD|x");
-                a.line("GAME|NOT_A_GAME");
+                inst.runOnMainSync(() -> {
+                    a.line("STATE|CHESS|bad");
+                    a.line("STATE|SEA|bad");
+                    a.line("STATE|DURAK|bad");
+                    a.line("ACTION|BAD|x");
+                    a.line("GAME|NOT_A_GAME");
+                });
                 assertTrue(!a.isFinishing() && !a.isDestroyed());
             }
         }
