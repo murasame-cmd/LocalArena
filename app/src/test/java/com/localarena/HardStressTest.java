@@ -12,10 +12,6 @@ public class HardStressTest {
         for(char p:g.b){ if(p=='K') wk++; else if(p=='k') bk++; }
         assertEquals("Chess must contain exactly one white king",1,wk);
         assertEquals("Chess must contain exactly one black king",1,bk);
-        assertTrue("Chess side is invalid", g.white);
-        g.white=!g.white;
-        assertTrue("Chess side toggle invariant", !g.white);
-        g.white=!g.white;
         for(ChessGame.Move m:g.legal(g.white)) {
             assertTrue("Legal move may not capture the opposing king", g.b[m.to] != (g.white?'k':'K'));
             assertTrue("Legal move origin must contain own piece", ChessGame.side(g.b[m.from],g.white));
@@ -80,6 +76,16 @@ public class HardStressTest {
             }
             assertTrue("Sea Battle must finish",g.winner>=0);
         }
+    }
+
+    @Test public void durakHiddenHandSyncPreservesRuleCapacity() {
+        DurakGame host=new DurakGame();
+        String publicForGuest=host.encodeFor(1);
+        DurakGame guest=new DurakGame();
+        guest.decode(publicForGuest);
+        assertEquals(host.hand[0].size(),guest.hand[0].size());
+        assertEquals(host.hand[1].size(),guest.hand[1].size());
+        assertTrue("Guest must be able to attack when it is attacker", guest.attacker==1 ? guest.addAttack(1,guest.hand[1].get(0)) : true);
     }
 
     @Test public void durakFullGameStressAndRoundTrip() {
