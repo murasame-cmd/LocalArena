@@ -74,6 +74,20 @@ public class LogicSimulationTest {
         assertTrue("Sea Battle did not finish",s.winner>=0);
     }
 
+    @Test public void seaBattlePlacementNeverThrowsAcrossManySeeds(){
+        SeaBattleGame s=new SeaBattleGame();
+        for(int seed=0;seed<1000;seed++){
+            s.randomPlace(0,seed);
+            assertTrue("invalid fleet seed "+seed,s.validFleet(s.cells[0]));
+        }
+    }
+
+    @Test public void seaBattleFallbackLayoutIsValid(){
+        SeaBattleGame s=new SeaBattleGame();
+        s.randomPlace(0,Long.MIN_VALUE);
+        assertTrue(s.validFleet(s.cells[0]));
+    }
+
     @Test public void durakFullSmoke(){
         DurakGame d=new DurakGame();
         assertEquals(6,d.hand[0].size());
