@@ -36,6 +36,8 @@ final class LocalNet {
 
  LocalNet(Context context,Handler h,Listener l){appContext=context.getApplicationContext();main=h;listener=l;}
 
+ void postHostAddress(String ip){main.post(()->listener.hostAddress(ip));}
+
  void host(){
   close(); closing=false;
   new Thread(()->{
