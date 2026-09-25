@@ -7,6 +7,7 @@ import android.net.ConnectivityManager;
 import android.net.LinkProperties;
 import android.net.Network;
 import android.net.NetworkCapabilities;
+import android.security.NetworkSecurityPolicy;
 import java.io.*;
 import java.net.*;
 import java.util.*;
@@ -325,6 +326,7 @@ final class LocalNet {
    LinkProperties lp=active==null||cm==null?null:cm.getLinkProperties(active);
    StringBuilder s=new StringBuilder(stage);
    s.append(" localIp=").append(localIp());
+   s.append(" cleartextPolicy=").append(NetworkSecurityPolicy.getInstance().isCleartextTrafficPermitted());
    if(caps!=null){
     s.append(" wifi=").append(caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI));
     s.append(" ethernet=").append(caps.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET));
