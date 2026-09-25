@@ -102,8 +102,12 @@ public class HardStressTest {
                 assertTrue(g.attacker==0||g.attacker==1);
                 assertTrue(g.defender==0||g.defender==1);
                 assertNotEquals(g.attacker,g.defender);
-                assertTrue(g.hand[0].size()<=6 || g.deck.isEmpty());
-                assertTrue(g.hand[1].size()<=6 || g.deck.isEmpty());
+                int total=0; boolean[] seen=new boolean[36];
+                for(int p=0;p<2;p++) for(int card:g.hand[p]) { assertTrue(card>=0&&card<36); assertFalse("Duplicate card in hands",seen[card]); seen[card]=true; total++; }
+                for(int card:g.attack) { assertTrue(card>=0&&card<36); assertFalse("Duplicate attack card",seen[card]); seen[card]=true; total++; }
+                for(int card:g.defense) if(card>=0) { assertTrue(card>=0&&card<36); assertFalse("Duplicate defense card",seen[card]); seen[card]=true; total++; }
+                for(int card:g.deck) { assertTrue(card>=0&&card<36); assertFalse("Duplicate deck card",seen[card]); seen[card]=true; total++; }
+                assertEquals("Every Durak card must exist exactly once",36,total);
 
                 if(g.attack.isEmpty()){
                     List<Integer> choices=new ArrayList<>(g.hand[g.attacker]);
