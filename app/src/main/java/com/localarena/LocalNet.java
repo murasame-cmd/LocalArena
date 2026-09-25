@@ -2,6 +2,11 @@ package com.localarena;
 
 import android.os.*;
 import android.util.Log;
+import android.content.Context;
+import android.net.ConnectivityManager;
+import android.net.LinkProperties;
+import android.net.Network;
+import android.net.NetworkCapabilities;
 import java.io.*;
 import java.net.*;
 import java.util.*;
@@ -22,15 +27,16 @@ final class LocalNet {
  static final String DISCOVERY_REQUEST="LOCALARENA_DISCOVER|1";
  static final String DISCOVERY_RESPONSE="LOCALARENA_HOST|1";
  static final String TAG="LocalArenaNet";
- final Handler main; final Listener listener;
+ final Handler main; final Listener listener; final Context appContext;
  volatile ServerSocket server; volatile Socket socket; volatile DatagramSocket discoverySocket;
  BufferedReader in; PrintWriter out;
  volatile boolean closing=false;
 
- LocalNet(Handler h,Listener l){main=h;listener=l;}
+ LocalNet(Context context,Handler h,Listener l){appContext=context.getApplicationContext();main=h;listener=l;}
 
  void host(){
   close(); closing=false;
+  logNetworkEnvironment("HOST_START");
   startDiscoveryResponder();
   new Thread(()->{
    try{
@@ -64,6 +70,7 @@ final class LocalNet {
 
  void join(String ip){
   close(); closing=false;
+  logNetworkEnvironment("JOIN_START target="+(ip==null?"":ip.trim()));
   final String target=ip==null?"":ip.trim();
   new Thread(()->{
    try{
@@ -92,35 +99,60 @@ final class LocalNet {
 
  void discover(){
   close(); closing=false;
+  logNetworkEnvironment("DISCOVERY_START");
   new Thread(()->{
    Set<String> found=new LinkedHashSet<>();
-   try(DatagramSocket ds=new DatagramSocket()){
-    ds.setBroadcast(true);
-    ds.setSoTimeout(700);
+   try{
     byte[] data=DISCOVERY_REQUEST.getBytes("UTF-8");
-    List<InetAddress> targets=broadcastTargets();
-    log("DISCOVERY_START targets="+targets);
-    for(InetAddress target:targets){
-     DatagramPacket p=new DatagramPacket(data,data.length,target,DISCOVERY_PORT);
-     ds.send(p);
-     log("DISCOVERY_TX target="+target.getHostAddress());
+    List<InterfaceEndpoint> endpoints=interfaceEndpoints();
+    log("DISCOVERY_INTERFACES "+endpoints);
+    if(endpoints.isEmpty()){
+     postError("Поиск хоста: не найден активный IPv4-интерфейс");
+     return;
     }
-    long deadline=System.currentTimeMillis()+3500;
-    while(System.currentTimeMillis()<deadline&&!closing){
-     try{
-      byte[] buf=new byte[256];
-      DatagramPacket p=new DatagramPacket(buf,buf.length);
-      ds.receive(p);
-      String msg=new String(p.getData(),p.getOffset(),p.getLength(),"UTF-8");
-      log("DISCOVERY_RX from="+p.getAddress().getHostAddress()+" msg="+msg);
-      if(msg.startsWith(DISCOVERY_RESPONSE+"|")){
-       String ip=p.getAddress().getHostAddress();
-       if(found.add(ip)){postDiscovered(ip);break;}
+    for(InterfaceEndpoint ep:endpoints){
+     if(closing)break;
+     try(DatagramSocket ds=new DatagramSocket(null)){
+      ds.setReuseAddress(true);
+      ds.setBroadcast(true);
+      ds.bind(new InetSocketAddress(ep.address,0));
+      ds.setSoTimeout(400);
+      List<InetAddress> targets=new ArrayList<>();
+      if(ep.broadcast!=null)targets.add(ep.broadcast);
+      try{
+       InetAddress global=InetAddress.getByName("255.255.255.255");
+       if(!targets.contains(global))targets.add(global);
+      }catch(Exception ignored){}
+      log("DISCOVERY_SOCKET iface="+ep.name+" local="+ep.address.getHostAddress()+" broadcast="+(ep.broadcast==null?"-":ep.broadcast.getHostAddress())+" port="+ds.getLocalPort());
+      for(InetAddress target:targets){
+       DatagramPacket p=new DatagramPacket(data,data.length,target,DISCOVERY_PORT);
+       ds.send(p);
+       log("DISCOVERY_TX iface="+ep.name+" target="+target.getHostAddress());
       }
-     }catch(SocketTimeoutException ignored){}
+      long deadline=System.currentTimeMillis()+1400;
+      while(System.currentTimeMillis()<deadline&&!closing){
+       try{
+        byte[] buf=new byte[256];
+        DatagramPacket p=new DatagramPacket(buf,buf.length);
+        ds.receive(p);
+        String msg=new String(p.getData(),p.getOffset(),p.getLength(),"UTF-8");
+        log("DISCOVERY_RX iface="+ep.name+" from="+p.getAddress().getHostAddress()+" msg="+msg);
+        if(msg.startsWith(DISCOVERY_RESPONSE+"|")){
+         String ip=p.getAddress().getHostAddress();
+         if(found.add(ip)){
+          postDiscovered(ip);
+          break;
+         }
+        }
+       }catch(SocketTimeoutException ignored){}
+      }
+     }catch(Exception e){
+      logException("DISCOVERY_INTERFACE_ERROR iface="+ep.name,e);
+     }
+     if(!found.isEmpty())break;
     }
-    if(found.isEmpty())postError("Хост не найден. Проверь, что оба телефона подключены к одной Wi‑Fi сети и роутер не изолирует устройства");
-    else postStatus("Найден хост: "+found.iterator().next());
+    if(found.isEmpty()&&!closing)postError("Хост не найден. Проверь, что оба телефона подключены к одной Wi‑Fi сети, имеют общий IPv4-сегмент и роутер не изолирует устройства");
+    else if(!found.isEmpty())postStatus("Найден хост: "+found.iterator().next());
    }catch(Exception e){
     logException("DISCOVERY_ERROR",e);
     if(!closing)postError("Поиск хоста: "+safeMessage(e));
@@ -162,21 +194,38 @@ final class LocalNet {
   },"ArenaDiscoveryHost").start();
  }
 
- static List<InetAddress> broadcastTargets(){
-  LinkedHashSet<InetAddress> result=new LinkedHashSet<>();
-  try{result.add(InetAddress.getByName("255.255.255.255"));}catch(Exception ignored){}
+ static final class InterfaceEndpoint{
+  final String name; final InetAddress address; final InetAddress broadcast;
+  InterfaceEndpoint(String n,InetAddress a,InetAddress b){name=n;address=a;broadcast=b;}
+  @Override public String toString(){return name+"="+address.getHostAddress()+"/"+(broadcast==null?"-":broadcast.getHostAddress());}
+ }
+
+ static List<InterfaceEndpoint> interfaceEndpoints(){
+  List<InterfaceEndpoint> result=new ArrayList<>();
   try{
    Enumeration<NetworkInterface> e=NetworkInterface.getNetworkInterfaces();
    while(e.hasMoreElements()){
     NetworkInterface n=e.nextElement();
-    if(!n.isUp()||n.isLoopback())continue;
+    if(!n.isUp()||n.isLoopback()||n.isVirtual())continue;
     for(InterfaceAddress ia:n.getInterfaceAddresses()){
-     InetAddress b=ia.getBroadcast();
-     if(b!=null)result.add(b);
+     InetAddress a=ia.getAddress();
+     if(a instanceof Inet4Address&&!a.isLoopbackAddress()&&isPrivateIpv4(a.getHostAddress())){
+      result.add(new InterfaceEndpoint(n.getName(),a,ia.getBroadcast()));
+     }
     }
    }
   }catch(Exception ignored){}
-  return new ArrayList<>(result);
+  result.sort((a,b)->{
+   boolean aw=isWifiName(a.name),bw=isWifiName(b.name);
+   return aw==bw?0:(aw?-1:1);
+  });
+  return result;
+ }
+
+ static boolean isWifiName(String name){
+  if(name==null)return false;
+  String n=name.toLowerCase(Locale.US);
+  return n.startsWith("wlan")||n.startsWith("wifi")||n.startsWith("swlan");
  }
 
  void setup(Socket s)throws IOException{
@@ -249,27 +298,43 @@ final class LocalNet {
 
  static String localIp(){
   try{
-   Enumeration<NetworkInterface>e=NetworkInterface.getNetworkInterfaces();
-   String fallback=null;
-   while(e.hasMoreElements()){
-    NetworkInterface n=e.nextElement();
-    if(!n.isUp()||n.isLoopback())continue;
-    boolean wifi=n.getName()!=null&&(n.getName().startsWith("wlan")||n.getName().startsWith("wifi"));
-    Enumeration<InetAddress>a=n.getInetAddresses();
-    while(a.hasMoreElements()){
-     InetAddress x=a.nextElement();String ip=x.getHostAddress();
-     if(x instanceof Inet4Address&&!x.isLoopbackAddress()&&isPrivateIpv4(ip)){
-      if(wifi)return ip;
-      if(fallback==null)fallback=ip;
-     }
-    }
-   }
-   if(fallback!=null)return fallback;
+   List<InterfaceEndpoint> eps=interfaceEndpoints();
+   for(InterfaceEndpoint ep:eps)if(isWifiName(ep.name))return ep.address.getHostAddress();
+   if(!eps.isEmpty())return eps.get(0).address.getHostAddress();
   }catch(Exception ignored){}
   return "0.0.0.0";
  }
 
  static boolean isPrivateIpv4(String ip){
-  return ip.startsWith("192.168.")||ip.startsWith("10.")||ip.startsWith("172.");
+  if(ip==null)return false;
+  if(ip.startsWith("10."))return true;
+  if(ip.startsWith("192.168."))return true;
+  if(ip.startsWith("172.")){
+   String[] p=ip.split("\\.");
+   if(p.length<2)return false;
+   try{int second=Integer.parseInt(p[1]);return second>=16&&second<=31;}catch(NumberFormatException ignored){}
+  }
+  return false;
+ }
+
+ void logNetworkEnvironment(String stage){
+  try{
+   ConnectivityManager cm=(ConnectivityManager)appContext.getSystemService(Context.CONNECTIVITY_SERVICE);
+   Network active=cm==null?null:cm.getActiveNetwork();
+   NetworkCapabilities caps=active==null||cm==null?null:cm.getNetworkCapabilities(active);
+   LinkProperties lp=active==null||cm==null?null:cm.getLinkProperties(active);
+   StringBuilder s=new StringBuilder(stage);
+   s.append(" localIp=").append(localIp());
+   if(caps!=null){
+    s.append(" wifi=").append(caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI));
+    s.append(" ethernet=").append(caps.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET));
+   }
+   if(lp!=null){
+    s.append(" iface=").append(lp.getInterfaceName());
+    s.append(" addresses=").append(lp.getLinkAddresses());
+    s.append(" routes=").append(lp.getRoutes());
+   }
+   log("NETWORK_ENV "+s);
+  }catch(Exception e){logException("NETWORK_ENV_ERROR",e);}
  }
 }
