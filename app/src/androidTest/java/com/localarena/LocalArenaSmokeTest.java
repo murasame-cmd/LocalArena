@@ -155,4 +155,52 @@ public class LocalArenaSmokeTest {
 
         inst.runOnMainSync(a::finish);
     }
+
+    private static void tap(MainActivity a, float x, float y) {
+        long now = System.currentTimeMillis();
+        MotionEvent down = MotionEvent.obtain(now, now, MotionEvent.ACTION_DOWN, x, y, 0);
+        a.view.onTouchEvent(down);
+        down.recycle();
+        MotionEvent up = MotionEvent.obtain(now, now + 5, MotionEvent.ACTION_UP, x, y, 0);
+        a.view.onTouchEvent(up);
+        up.recycle();
+    }
+
+    @Test(timeout=60000) public void roomAndPickerButtonsLaunchEveryGameForEitherPlayer() throws Exception {
+        Instrumentation inst = InstrumentationRegistry.getInstrumentation();
+        Intent intent = new Intent(inst.getTargetContext(), MainActivity.class);
+        intent.putExtra("SKIP_RUNTIME_PERMISSIONS", true);
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+        MainActivity a = (MainActivity) inst.startActivitySync(intent);
+        assertNotNull(a);
+
+        inst.runOnMainSync(() -> {
+            a.view.measure(View.MeasureSpec.makeMeasureSpec(1080, View.MeasureSpec.EXACTLY),
+                    View.MeasureSpec.makeMeasureSpec(1920, View.MeasureSpec.EXACTLY));
+            a.view.layout(0, 0, 1080, 1920);
+            float d = a.view.d;
+            String[] games = {"CHESS", "SEA", "DURAK"};
+
+            for (boolean isHost : new boolean[]{true, false}) {
+                a.host = isHost;
+                a.connected = true;
+                a.me = isHost ? 0 : 1;
+
+                a.show(MainActivity.Screen.ROOM);
+                tap(a, 540, 348 * d);
+                assertEquals("Room action must open the picker for host=" + isHost,
+                        MainActivity.Screen.PICKER, a.screen);
+
+                float[] centers = {182 * d, 250 * d, 318 * d};
+                for (int i = 0; i < games.length; i++) {
+                    a.show(MainActivity.Screen.PICKER);
+                    tap(a, 540, centers[i]);
+                    assertEquals("Picker button must launch " + games[i] + " for host=" + isHost,
+                            games[i], a.screen.name());
+                }
+            }
+        });
+
+        inst.runOnMainSync(a::finish);
+    }
 }
