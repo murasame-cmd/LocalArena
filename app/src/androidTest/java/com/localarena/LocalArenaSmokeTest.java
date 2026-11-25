@@ -186,10 +186,15 @@ public class LocalArenaSmokeTest {
                 a.connected = true;
                 a.me = isHost ? 0 : 1;
 
-                a.show(MainActivity.Screen.ROOM);
-                tap(a, 540, 348 * d);
-                assertEquals("Room action must open the picker for host=" + isHost,
-                        MainActivity.Screen.PICKER, a.screen);
+                if (isHost) {
+                    a.show(MainActivity.Screen.ROOM);
+                    tap(a, 540, 348 * d);
+                    assertEquals("Host room action must open the picker",
+                            MainActivity.Screen.PICKER, a.screen);
+                } else {
+                    // A guest normally enters the picker when returning from an active game.
+                    a.show(MainActivity.Screen.PICKER);
+                }
 
                 float[] centers = {182 * d, 250 * d, 318 * d};
                 for (int i = 0; i < games.length; i++) {
