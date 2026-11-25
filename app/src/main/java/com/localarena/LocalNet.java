@@ -46,6 +46,8 @@ final class LocalNet {
  volatile DatagramSocket discoverySocket;
  volatile boolean closing=true;
   volatile long generation=0;
+ Network previousProcessNetwork;
+ boolean processNetworkBound=false;
 
  BufferedReader in;
  PrintWriter out;
@@ -63,12 +65,15 @@ final class LocalNet {
   new Thread(()->{
    try{
     logNetworkEnvironment("HOST_START");
+    bindProcessToWifi(runId);
+    if(!active(runId))return;
     startDiscoveryResponder();
 
     ServerSocket ss=new ServerSocket();
     ss.setReuseAddress(true);
     ss.bind(new InetSocketAddress("0.0.0.0",PORT));
     server=ss;
+    if(!active(runId)){safeClose(ss);return;}
 
     String hostIp=localIp();
     log("HOST_LISTENING ip="+hostIp+" port="+PORT);
@@ -115,7 +120,11 @@ final class LocalNet {
     Socket s=new Socket();
     s.setTcpNoDelay(true);
     s.setKeepAlive(true);
+    if(!registerPendingSocket(runId,s))return;
+    bindSocketToWifi(s,"JOIN");
+    if(!active(runId)){safeClose(s);return;}
     s.connect(new InetSocketAddress(target,PORT),CONNECT_TIMEOUT_MS);
+    if(!active(runId)){safeClose(s);return;}
 
     log("JOIN_CONNECTED remote="+s.getRemoteSocketAddress()+" local="+s.getLocalSocketAddress());
     setup(s);
@@ -163,6 +172,7 @@ final class LocalNet {
      try(DatagramSocket ds=new DatagramSocket(null)){
       ds.setReuseAddress(true);
       ds.setBroadcast(true);
+      if(isWifiName(ep.name))bindDatagramToWifi(ds,ep.name);
       ds.bind(new InetSocketAddress(ep.address,0));
       ds.setSoTimeout(300);
 
@@ -253,7 +263,13 @@ final class LocalNet {
   },"ArenaDiscoveryHost").start();
  }
 
- void setup(Socket s)throws IOException{
+ synchronized boolean registerPendingSocket(long runId,Socket s){
+  if(!active(runId)){safeClose(s);return false;}
+  socket=s;
+  return true;
+ }
+
+ synchronized void setup(Socket s)throws IOException{
   socket=s;
   s.setTcpNoDelay(true);
   s.setKeepAlive(true);
@@ -269,22 +285,29 @@ final class LocalNet {
  // HOST -> HELLO|2
  // GUEST -> HELLO_ACK|2
  void handshake(boolean hostSide)throws IOException{
+  BufferedReader reader=in;
+  PrintWriter writer=out;
+  if(reader==null||writer==null)throw new IOException("Сокет не готов к рукопожатию");
   log("HANDSHAKE_START side="+(hostSide?"HOST":"GUEST"));
 
   if(hostSide){
-   send("HELLO|"+PROTOCOL_VERSION);
-   String line=in.readLine();
+   writer.println("HELLO|"+PROTOCOL_VERSION);
+   writer.flush();
+   if(writer.checkError())throw new IOException("Не удалось отправить HELLO");
+   String line=reader.readLine();
    log("HANDSHAKE_RX side=HOST line="+line);
    if(!("HELLO_ACK|"+PROTOCOL_VERSION).equals(line)){
     throw new IOException("Неверное рукопожатие");
    }
   }else{
-   String line=in.readLine();
+   String line=reader.readLine();
    log("HANDSHAKE_RX side=GUEST line="+line);
    if(!("HELLO|"+PROTOCOL_VERSION).equals(line)){
     throw new IOException("Неверное рукопожатие");
    }
-   send("HELLO_ACK|"+PROTOCOL_VERSION);
+   writer.println("HELLO_ACK|"+PROTOCOL_VERSION);
+   writer.flush();
+   if(writer.checkError())throw new IOException("Не удалось отправить HELLO_ACK");
   }
 
   socket.setSoTimeout(0);
@@ -292,10 +315,12 @@ final class LocalNet {
  }
 
  void readLoop(long runId)throws IOException{
+  final BufferedReader reader=in;
+  if(reader==null)throw new IOException("Поток чтения не инициализирован");
   log("READ_LOOP_START");
 
   String line;
-  while(active(runId) && (line=in.readLine())!=null){
+  while(active(runId) && (line=reader.readLine())!=null){
    final String message=line;
    if(message.length()>8192){
     log("RX_REJECT_TOO_LONG len="+message.length());
@@ -317,7 +342,7 @@ final class LocalNet {
    return;
   }
 
-  if(message==null || message.indexOf('\n')>=0 || message.indexOf('\r')>=0){
+  if(message==null || message.length()>8192 || message.indexOf('\n')>=0 || message.indexOf('\r')>=0){
    log("TX_REJECT_BAD_FRAME");
    return;
   }
@@ -348,6 +373,7 @@ final class LocalNet {
   discoverySocket=null;
   in=null;
   out=null;
+  restoreProcessNetwork();
 
   if(wasOpen)log("CLOSE_DONE");
  }
@@ -465,6 +491,60 @@ final class LocalNet {
   }catch(Exception ignored){}
 
   return "0.0.0.0";
+ }
+
+
+ Network wifiNetwork(){
+  try{
+   ConnectivityManager cm=(ConnectivityManager)appContext.getSystemService(Context.CONNECTIVITY_SERVICE);
+   if(cm==null)return null;
+   Network active=cm.getActiveNetwork();
+   if(active!=null){NetworkCapabilities caps=cm.getNetworkCapabilities(active);if(caps!=null&&caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI))return active;}
+   for(Network n:cm.getAllNetworks()){
+    NetworkCapabilities caps=cm.getNetworkCapabilities(n);
+    if(caps!=null&&caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI))return n;
+   }
+  }catch(Exception e){logException("WIFI_NETWORK_LOOKUP_ERROR",e);}
+  return null;
+ }
+
+ void bindProcessToWifi(long runId){
+  try{
+   ConnectivityManager cm=(ConnectivityManager)appContext.getSystemService(Context.CONNECTIVITY_SERVICE);
+   Network wifi=wifiNetwork();
+   if(cm==null||wifi==null){log("WIFI_PROCESS_BIND_SKIPPED reason=no-active-wifi");return;}
+   synchronized(this){
+    if(!active(runId))return;
+    Network previous=cm.getBoundNetworkForProcess();
+    boolean ok=cm.bindProcessToNetwork(wifi);
+    if(ok){previousProcessNetwork=previous;processNetworkBound=true;}
+    log("WIFI_PROCESS_BIND stage=HOST success="+ok+" network="+wifi);
+   }
+  }catch(Exception e){logException("WIFI_PROCESS_BIND_ERROR",e);}
+ }
+
+ void bindSocketToWifi(Socket s,String stage){
+  Network wifi=wifiNetwork();
+  if(wifi==null){log("WIFI_SOCKET_BIND_SKIPPED stage="+stage+" reason=no-active-wifi");return;}
+  try{wifi.bindSocket(s);log("WIFI_SOCKET_BIND stage="+stage+" success=true network="+wifi);}
+  catch(Exception e){logException("WIFI_SOCKET_BIND_ERROR stage="+stage,e);}
+ }
+
+ void bindDatagramToWifi(DatagramSocket s,String iface){
+  Network wifi=wifiNetwork();
+  if(wifi==null){log("WIFI_UDP_BIND_SKIPPED iface="+iface+" reason=no-active-wifi");return;}
+  try{wifi.bindSocket(s);log("WIFI_UDP_BIND iface="+iface+" success=true network="+wifi);}
+  catch(Exception e){logException("WIFI_UDP_BIND_ERROR iface="+iface,e);}
+ }
+
+ void restoreProcessNetwork(){
+  if(!processNetworkBound)return;
+  try{
+   ConnectivityManager cm=(ConnectivityManager)appContext.getSystemService(Context.CONNECTIVITY_SERVICE);
+   boolean ok=cm!=null&&cm.bindProcessToNetwork(previousProcessNetwork);
+   log("WIFI_PROCESS_BIND_RESTORE success="+ok);
+  }catch(Exception e){logException("WIFI_PROCESS_BIND_RESTORE_ERROR",e);}
+  finally{processNetworkBound=false;previousProcessNetwork=null;}
  }
 
  void logNetworkEnvironment(String stage){

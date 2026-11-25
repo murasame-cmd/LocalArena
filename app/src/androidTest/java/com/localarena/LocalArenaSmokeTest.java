@@ -129,4 +129,30 @@ public class LocalArenaSmokeTest {
         }
         inst.runOnMainSync(a::finish);
     }
+
+    @Test(timeout=30000) public void discoveryResultIsAcceptedOnRoomScreen() throws Exception {
+        Instrumentation inst = InstrumentationRegistry.getInstrumentation();
+        Intent intent = new Intent(inst.getTargetContext(), MainActivity.class);
+        intent.putExtra("SKIP_RUNTIME_PERMISSIONS", true);
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+        MainActivity a = (MainActivity) inst.startActivitySync(intent);
+        assertNotNull(a);
+
+        inst.runOnMainSync(() -> {
+            a.show(MainActivity.Screen.ROOM);
+            a.discoveryPending = false;
+            a.discovered("127.0.0.1");
+            assertEquals("A stale discovery callback must be ignored", "", a.ip);
+
+            a.discoveryPending = true;
+            a.discovered("127.0.0.1");
+        });
+
+        assertEquals("A search result must be accepted while the room/search screen is visible",
+                "127.0.0.1", a.ip);
+        assertFalse("The discovery request must be consumed exactly once", a.discoveryPending);
+        assertEquals(MainActivity.Screen.ROOM, a.screen);
+
+        inst.runOnMainSync(a::finish);
+    }
 }
